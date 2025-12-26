@@ -42,6 +42,7 @@ private:
     bool destination_is_available(const std::filesystem::path& destination_path) const;
     bool perform_move(const std::filesystem::path& source_path,
                       const std::filesystem::path& destination_path) const;
+    void update_paths();
 
     std::string file_name;
     std::string dir_path;

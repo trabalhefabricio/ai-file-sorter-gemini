@@ -274,6 +274,14 @@ std::string MovableCategorizedFile::get_subcategory() const
     return subcategory;
 }
 
+void MovableCategorizedFile::update_paths()
+{
+    const std::filesystem::path base_dir = Utils::utf8_to_path(dir_path);
+    category_path = base_dir / Utils::utf8_to_path(category);
+    subcategory_path = category_path / Utils::utf8_to_path(subcategory);
+    destination_path = subcategory_path / Utils::utf8_to_path(file_name);
+}
+
 void MovableCategorizedFile::set_category(const std::string& new_category)
 {
     std::string validation_error;
@@ -285,12 +293,7 @@ void MovableCategorizedFile::set_category(const std::string& new_category)
     }
     
     this->category = new_category;
-    
-    // Update computed paths to maintain consistency
-    const std::filesystem::path base_dir = Utils::utf8_to_path(dir_path);
-    category_path = base_dir / Utils::utf8_to_path(category);
-    subcategory_path = category_path / Utils::utf8_to_path(subcategory);
-    destination_path = subcategory_path / Utils::utf8_to_path(file_name);
+    update_paths();
 }
 
 void MovableCategorizedFile::set_subcategory(const std::string& new_subcategory)
@@ -304,12 +307,7 @@ void MovableCategorizedFile::set_subcategory(const std::string& new_subcategory)
     }
     
     this->subcategory = new_subcategory;
-    
-    // Update computed paths to maintain consistency
-    const std::filesystem::path base_dir = Utils::utf8_to_path(dir_path);
-    category_path = base_dir / Utils::utf8_to_path(category);
-    subcategory_path = category_path / Utils::utf8_to_path(subcategory);
-    destination_path = subcategory_path / Utils::utf8_to_path(file_name);
+    update_paths();
 }
 
 MovableCategorizedFile::~MovableCategorizedFile() {}
