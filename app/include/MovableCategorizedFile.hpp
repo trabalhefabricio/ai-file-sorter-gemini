@@ -28,8 +28,8 @@ public:
     std::string get_dir_path() const;
     std::string get_category() const;
     std::string get_subcategory() const;
-    void set_category(std::string& category);
-    void set_subcategory(std::string& subcategory);
+    void set_category(const std::string& category);
+    void set_subcategory(const std::string& subcategory);
 
 private:
     struct MovePaths {
