@@ -12,25 +12,25 @@ This document tracks the implementation status of Gemini API support in the AI F
 
 ##### ✅ Completed Tasks:
 1. **API Endpoint Configuration** 
-   - Location: `app/lib/LLMClient.cpp:242-243`
-   - Gemini API endpoint configured: `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`
-   - Automatic endpoint selection based on model name detection
+   - Location: `app/lib/LLMClient.cpp:237-247`
+   - Gemini API endpoint configured: `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions` (line 243)
+   - Automatic endpoint selection based on model name detection (lines 237-242)
 
 2. **Model Detection Logic**
    - Location: `app/lib/LLMClient.cpp:237-242`
-   - Case-insensitive detection of "gemini" in model name
-   - Automatic routing to appropriate API endpoint
+   - Case-insensitive detection of "gemini" in model name (lines 238-239)
+   - Automatic routing to appropriate API endpoint (line 242-243)
 
 3. **Timeout Handling**
-   - Location: `app/lib/LLMClient.cpp:241, 244-246`
+   - Location: `app/lib/LLMClient.cpp:241, 246`
    - Extended timeout for Gemini API calls (300 seconds vs 30 seconds for OpenAI)
    - Configurable timeout to accommodate Gemini's response latency
 
 4. **Error Handling**
-   - Location: `app/lib/LLMClient.cpp:184-199`
+   - Location: `app/lib/LLMClient.cpp:185-199`
    - Support for both OpenAI and Gemini error response formats
-   - Handles Gemini's array-based error responses
-   - Handles OpenAI's object-based error responses
+   - Handles Gemini's array-based error responses (line 191-192)
+   - Handles OpenAI's object-based error responses (line 188-189)
 
 5. **Request/Response Flow**
    - Location: `app/lib/LLMClient.cpp:228-261`
@@ -64,8 +64,8 @@ This document tracks the implementation status of Gemini API support in the AI F
 
 **Modified Files:**
 - `app/lib/LLMClient.cpp`
-  - Lines 184-199: Error handling for both OpenAI and Gemini formats
-  - Lines 236-247: Gemini endpoint selection and timeout configuration
+  - Lines 185-199: Error handling for both OpenAI and Gemini formats
+  - Lines 237-247: Gemini endpoint selection and timeout configuration
 
 **Unchanged Files (requiring updates):**
 - `README.md` - Needs Gemini documentation
