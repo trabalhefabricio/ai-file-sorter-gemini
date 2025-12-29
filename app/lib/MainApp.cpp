@@ -169,9 +169,8 @@ MainApp::MainApp(Settings& settings, bool development_mode, QWidget* parent)
     profile_manager_ = std::make_unique<UserProfileManager>(db_manager, core_logger);
     profile_manager_->initialize_profile("default");
 
-    // Initialize AI Error Resolver (will create LLM client on demand)
-    // Note: LLM client is created lazily when needed to avoid initialization overhead
-    ai_error_resolver_ = nullptr;  // Will be initialized on first error that needs AI help
+    // AI Error Resolver will be lazily initialized on first use to avoid overhead
+    // See get_or_create_error_resolver()
 
     using_local_llm = settings.get_llm_choice() != LLMChoice::Remote;
 
