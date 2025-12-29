@@ -8,6 +8,7 @@
 #include <vector>
 #include <memory>
 #include <optional>
+#include <functional>
 
 /**
  * @brief AI-powered error analysis and resolution system

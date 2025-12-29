@@ -415,9 +415,12 @@ bool AIErrorResolver::validate_api_key(const std::string& api_key) {
 bool AIErrorResolver::reset_rate_limiter() {
     try {
         Logger::log_info("AIErrorResolver: Attempting to reset rate limiter");
-        // This would interact with the rate limiter component
-        // For now, just return success
-        return true;
+        // NOTE: This is a placeholder implementation
+        // Actual rate limiter reset would require integration with the specific
+        // rate limiting component (e.g., GeminiClient rate limiter)
+        // For now, we log the attempt but return false to indicate no actual reset was performed
+        Logger::log_warning("AIErrorResolver: Rate limiter reset not implemented - requires integration with specific rate limiting component");
+        return false;
     } catch (const std::exception& e) {
         Logger::log_error("AIErrorResolver: Failed to reset rate limiter: " + std::string(e.what()));
         return false;
@@ -427,8 +430,11 @@ bool AIErrorResolver::reset_rate_limiter() {
 bool AIErrorResolver::check_network_connectivity() {
     try {
         Logger::log_info("AIErrorResolver: Checking network connectivity");
-        // Simple connectivity check - could be enhanced
-        return true;
+        // NOTE: This is a placeholder implementation
+        // Actual network check would require a simple HTTP request or ping
+        // For now, we log the attempt but return false to indicate no actual check was performed
+        Logger::log_warning("AIErrorResolver: Network connectivity check not implemented - requires HTTP/ICMP implementation");
+        return false;
     } catch (const std::exception& e) {
         Logger::log_error("AIErrorResolver: Network check failed: " + std::string(e.what()));
         return false;
