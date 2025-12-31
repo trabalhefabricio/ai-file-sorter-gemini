@@ -19,7 +19,7 @@ jobs:
         with:
           submodules: recursive
 
-      # Cache Qt installation and ccache to speed up subsequent builds
+      # Cache Qt installation to speed up subsequent builds
       # Qt is large (~1GB) so caching it saves significant download/install time
       - name: Cache Qt
         id: cache-qt
@@ -27,7 +27,6 @@ jobs:
         with:
           path: |
             ${{ github.workspace }}/Qt
-            ~/.cache/ccache
           key: qt-${{ runner.os }}-6.6.3-${{ hashFiles('.github/workflows/build.yml') }}
           restore-keys: |
             qt-${{ runner.os }}-6.6.3-
@@ -40,15 +39,16 @@ jobs:
           target: desktop
           cached: ${{ steps.cache-qt.outputs.cache-hit }}
 
-      # Cache apt packages to avoid re-downloading on every build
-      - name: Cache apt packages
+      # Cache ccache directory separately for C++ compilation caching
+      # This dramatically speeds up rebuilds by caching compiled object files
+      - name: Cache ccache
         uses: actions/cache@v4
         with:
           path: |
-            /var/cache/apt/archives
-          key: apt-${{ runner.os }}-${{ hashFiles('.github/workflows/build.yml') }}
+            ~/.cache/ccache
+          key: ccache-${{ runner.os }}-${{ hashFiles('app/**/*.cpp', 'app/**/*.h') }}
           restore-keys: |
-            apt-${{ runner.os }}-
+            ccache-${{ runner.os }}-
 
       - name: Install dependencies
         run: |

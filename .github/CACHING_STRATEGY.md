@@ -14,20 +14,15 @@ The workflows implement a multi-layered caching approach that significantly spee
 - **Invalidation**: Changes to the workflow file trigger a fresh installation
 - **Impact**: Saves 3-5 minutes per build
 
-### 2. Apt Package Cache
-- **Cache Key**: `apt-{os}-{workflow-hash}`
-- **Purpose**: Caches downloaded .deb packages to avoid re-downloading
-- **Packages**: build-essential, cmake, ninja-build, libcurl4-openssl-dev, libjsoncpp-dev, libsqlite3-dev, libssl-dev, libfmt-dev, libspdlog-dev, ccache
-- **Invalidation**: Changes to the workflow file trigger re-download
-- **Impact**: Saves 1-2 minutes per build
-
-### 3. ccache (Compiler Cache)
-- **Cache Location**: `~/.cache/ccache` (stored with Qt cache)
+### 2. ccache (Compiler Cache)
+- **Cache Key**: `ccache-{os}-{source-hash}`
+- **Cache Location**: `~/.cache/ccache`
 - **Purpose**: Caches compiled object files to avoid recompiling unchanged source
 - **Configuration**: 500MB max size, compression enabled
+- **Invalidation**: Changes to source files (.cpp/.h)
 - **Impact**: Saves 10-20 minutes on incremental builds (most significant speedup)
 
-### 4. CMake Build Cache
+### 3. CMake Build Cache
 - **Cache Key**: `cmake-build-{os}-{cmake-hash}-{source-hash}`
 - **Purpose**: Preserves build artifacts for incremental compilation
 - **Paths Cached**:
