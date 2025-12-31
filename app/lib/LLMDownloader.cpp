@@ -33,7 +33,15 @@ LLMDownloader::LLMDownloader(const std::string& download_url)
 
 
 void LLMDownloader::set_download_destination() {
-    std::filesystem::create_directories(destination_dir);
+    std::error_code ec;
+    std::filesystem::create_directories(destination_dir, ec);
+    if (ec) {
+        auto logger = Logger::get_logger("core_logger");
+        if (logger) {
+            logger->warn("Failed to create download directory '{}': {}", destination_dir, ec.message());
+        }
+        // Continue anyway - the directory might already exist, or we'll catch the error on actual file write
+    }
     download_destination = Utils::make_default_path_to_file_from_download_url(url);
 }
 
