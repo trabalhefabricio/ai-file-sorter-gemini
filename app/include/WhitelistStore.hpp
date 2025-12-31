@@ -65,6 +65,10 @@ public:
                                     const std::vector<std::string>& subs);
     void initialize_from_settings(Settings& settings);
 
+    // Dynamic path addition for wizard mode
+    bool add_path_to_entry(const std::string& entry_name, const std::string& path);
+    std::vector<std::string> get_all_paths_from_entry(const std::string& entry_name) const;
+
     std::string default_name() const { return default_name_; }
 
 private:

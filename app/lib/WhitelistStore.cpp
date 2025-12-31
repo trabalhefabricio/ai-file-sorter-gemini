@@ -260,3 +260,100 @@ void WhitelistStore::initialize_from_settings(Settings& settings)
         settings.set_allowed_subcategories(entry->subcategories);
     }
 }
+
+// Dynamic path addition for wizard mode
+bool WhitelistStore::add_path_to_entry(const std::string& entry_name, const std::string& path)
+{
+    auto it = entries_.find(entry_name);
+    if (it == entries_.end()) {
+        // Entry doesn't exist, create it
+        WhitelistEntry new_entry;
+        new_entry.use_hierarchical = true;
+        entries_[entry_name] = new_entry;
+        it = entries_.find(entry_name);
+    }
+
+    auto& entry = it->second;
+    
+    // Parse path (e.g., "Audio/DAWs/FL Studio" -> ["Audio", "DAWs", "FL Studio"])
+    std::vector<std::string> parts;
+    std::string current;
+    for (char c : path) {
+        if (c == '/') {
+            if (!current.empty()) {
+                parts.push_back(current);
+                current.clear();
+            }
+        } else {
+            current += c;
+        }
+    }
+    if (!current.empty()) {
+        parts.push_back(current);
+    }
+
+    if (parts.empty()) {
+        return false;
+    }
+
+    // Build hierarchical structure
+    if (!entry.use_hierarchical) {
+        // Convert to hierarchical if needed
+        entry.use_hierarchical = true;
+        entry.category_subcategory_map.clear();
+    }
+
+    // For now, treat first part as category and rest as nested subcategories
+    // This is a simplified approach - full recursive support in future commits
+    const std::string& category = parts[0];
+    
+    // Add category if it doesn't exist
+    if (std::find(entry.categories.begin(), entry.categories.end(), category) == entry.categories.end()) {
+        entry.categories.push_back(category);
+    }
+
+    // Add all parts as subcategories
+    for (size_t i = 1; i < parts.size(); ++i) {
+        if (std::find(entry.subcategories.begin(), entry.subcategories.end(), parts[i]) == entry.subcategories.end()) {
+            entry.subcategories.push_back(parts[i]);
+        }
+    }
+
+    // Update hierarchical map
+    auto& subs = entry.category_subcategory_map[category];
+    for (size_t i = 1; i < parts.size(); ++i) {
+        if (std::find(subs.begin(), subs.end(), parts[i]) == subs.end()) {
+            subs.push_back(parts[i]);
+        }
+    }
+
+    return true;
+}
+
+std::vector<std::string> WhitelistStore::get_all_paths_from_entry(const std::string& entry_name) const
+{
+    std::vector<std::string> paths;
+    
+    auto it = entries_.find(entry_name);
+    if (it == entries_.end()) {
+        return paths;
+    }
+
+    const auto& entry = it->second;
+    
+    // Return all categories
+    for (const auto& cat : entry.categories) {
+        paths.push_back(cat);
+    }
+
+    // If hierarchical, add category/subcategory combinations
+    if (entry.use_hierarchical) {
+        for (const auto& [category, subs] : entry.category_subcategory_map) {
+            for (const auto& sub : subs) {
+                paths.push_back(category + "/" + sub);
+            }
+        }
+    }
+
+    return paths;
+}

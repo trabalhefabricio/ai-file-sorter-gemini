@@ -798,3 +798,91 @@ std::string CategorizationService::format_hint_block(const std::vector<CategoryP
     oss << "Prefer one of the above when it fits; otherwise, choose the closest consistent alternative.";
     return oss.str();
 }
+
+// Wizard integration methods
+
+bool CategorizationService::should_trigger_wizard(
+    const std::string& category,
+    const std::string& subcategory,
+    double confidence_score) const
+{
+    // Check if wizard mode is enabled
+    if (!settings.get_enable_category_wizard()) {
+        return false;
+    }
+
+    // Check confidence threshold
+    const double threshold = settings.get_wizard_confidence_threshold();
+    if (confidence_score > 0.0 && confidence_score < threshold) {
+        return true;
+    }
+
+    // Check for generic categories
+    const std::string cat_lower = to_lower_copy_str(category);
+    const std::string sub_lower = to_lower_copy_str(subcategory);
+    if (cat_lower == "uncategorized" || cat_lower == "miscellaneous" || 
+        cat_lower == "other" || cat_lower == "unknown" ||
+        sub_lower == "uncategorized" || sub_lower == "miscellaneous" || 
+        sub_lower == "other" || sub_lower == "unknown") {
+        return true;
+    }
+
+    return false;
+}
+
+std::optional<DatabaseManager::ResolvedCategory> CategorizationService::handle_wizard_categorization(
+    const FileEntry& entry,
+    const std::string& suggested_parent,
+    double confidence_score,
+    WhitelistStore* whitelist_store,
+    const ProgressCallback& progress_callback) const
+{
+    // This method would invoke the CategorySuggestionWizard dialog
+    // For now, we return empty to maintain current behavior
+    // Full UI integration will be added in Commit 4
+    
+    if (progress_callback) {
+        progress_callback(fmt::format("[WIZARD-READY] {} (confidence: {:.2f}, parent: '{}')",
+                                     entry.name, confidence_score, suggested_parent));
+    }
+    
+    if (core_logger) {
+        core_logger->info("Wizard trigger for '{}' with confidence {:.2f} and parent '{}'",
+                         entry.name, confidence_score, suggested_parent);
+    }
+    
+    // TODO: In Commit 4, instantiate CategorySuggestionWizard here
+    // and handle the result (UseParent/CreateNew/Skip)
+    
+    return std::nullopt;
+}
+
+bool CategorizationService::add_path_to_whitelist(
+    WhitelistStore* whitelist_store,
+    const std::string& path) const
+{
+    if (!whitelist_store) {
+        if (core_logger) {
+            core_logger->error("Cannot add path to whitelist: WhitelistStore is null");
+        }
+        return false;
+    }
+
+    const std::string default_name = whitelist_store->default_name();
+    const bool success = whitelist_store->add_path_to_entry(default_name, path);
+    
+    if (success) {
+        // Save immediately to persist changes
+        whitelist_store->save();
+        
+        if (core_logger) {
+            core_logger->info("Added path '{}' to whitelist '{}'", path, default_name);
+        }
+    } else {
+        if (core_logger) {
+            core_logger->warn("Failed to add path '{}' to whitelist", path);
+        }
+    }
+    
+    return success;
+}
