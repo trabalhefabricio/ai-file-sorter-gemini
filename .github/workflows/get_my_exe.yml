@@ -16,6 +16,8 @@ jobs:
         with:
           submodules: recursive
 
+      # Enable GitHub Actions cache for vcpkg binary caching
+      # This allows vcpkg to use GitHub's cache as a binary cache backend
       - name: Enable GitHub Cache
         uses: actions/github-script@v7
         with:
@@ -23,6 +25,7 @@ jobs:
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
+      # Install Qt with built-in caching support
       - name: Install Qt
         uses: jurplel/install-qt-action@v3
         with:
@@ -54,6 +57,8 @@ jobs:
           echo "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           Write-Host "✓ OpenBLAS installed successfully"
 
+      # Cache vcpkg installation to avoid cloning and bootstrapping on every build
+      # Invalidates when vcpkg.json changes
       - name: Cache vcpkg
         uses: actions/cache@v4
         with:
@@ -100,6 +105,9 @@ jobs:
             }
           }
 
+      # Cache vcpkg binary packages (pre-built binaries)
+      # This is the most important cache as it avoids rebuilding all dependencies
+      # Each package can take 5-30 minutes to build from source
       - name: Cache vcpkg binary cache
         uses: actions/cache@v4
         with:
@@ -127,6 +135,9 @@ jobs:
           
           Write-Host "All support libraries installed successfully."
 
+      # Cache Llama.cpp build artifacts (most time-consuming build step)
+      # Building llama.cpp from source can take 15-30 minutes
+      # Cache key includes source files to invalidate when llama.cpp is updated
       - name: Cache Llama Build
         id: cache-llama
         uses: actions/cache@v4
@@ -246,6 +257,8 @@ jobs:
             }
           }
 
+      # Cache CMake build directory for incremental builds
+      # Key includes git SHA for exact versioning, with fallback to CMakeLists.txt hash
       - name: Cache CMake Build
         uses: actions/cache@v4
         with:

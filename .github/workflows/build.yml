@@ -19,6 +19,8 @@ jobs:
         with:
           submodules: recursive
 
+      # Cache Qt installation and ccache to speed up subsequent builds
+      # Qt is large (~1GB) so caching it saves significant download/install time
       - name: Cache Qt
         id: cache-qt
         uses: actions/cache@v4
@@ -38,6 +40,7 @@ jobs:
           target: desktop
           cached: ${{ steps.cache-qt.outputs.cache-hit }}
 
+      # Cache apt packages to avoid re-downloading on every build
       - name: Cache apt packages
         uses: actions/cache@v4
         with:
@@ -52,12 +55,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build libcurl4-openssl-dev libjsoncpp-dev libsqlite3-dev libssl-dev libfmt-dev libspdlog-dev ccache
 
+      # Configure ccache for C++ compilation caching
+      # This dramatically speeds up rebuilds by caching compiled object files
       - name: Setup ccache
         run: |
           ccache --set-config=max_size=500M
           ccache --set-config=compression=true
           ccache --zero-stats
 
+      # Cache CMake build directory and llama.cpp build artifacts
+      # Key includes CMakeLists.txt and source files to invalidate when code changes
       - name: Cache CMake build
         uses: actions/cache@v4
         with:
@@ -79,6 +86,7 @@ jobs:
           export PATH="/usr/lib/ccache:$PATH"
           cmake --build build
 
+      # Show ccache statistics to monitor cache effectiveness
       - name: Show ccache statistics
         run: ccache --show-stats
 
