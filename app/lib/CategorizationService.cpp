@@ -845,10 +845,7 @@ std::optional<DatabaseManager::ResolvedCategory> CategorizationService::handle_w
     
     // Get all existing paths from the whitelist for validation
     std::vector<std::string> existing_paths;
-    if (whitelist_store) {
-        const auto& whitelist = whitelist_store->get_whitelist("Default");
-        existing_paths = whitelist_store->get_all_paths_from_entry(whitelist);
-    }
+    existing_paths = whitelist_store->get_all_paths_from_entry("Default");
     
     // Create and show the wizard dialog
     CategorySuggestionWizard wizard(entry, suggested_parent, confidence_score, existing_paths);
