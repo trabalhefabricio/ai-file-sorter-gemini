@@ -19,27 +19,16 @@ jobs:
         with:
           submodules: recursive
 
-      # Cache Qt installation to speed up subsequent builds
-      # Qt is large (~1GB) so caching it saves significant download/install time
-      - name: Cache Qt
-        id: cache-qt
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ github.workspace }}/Qt
-          key: qt-${{ runner.os }}-6.6.3-${{ hashFiles('.github/workflows/build.yml') }}
-          restore-keys: |
-            qt-${{ runner.os }}-6.6.3-
-
+      # Qt action has built-in caching support
       - name: Set up Qt
         uses: jurplel/install-qt-action@v3
         with:
           version: '6.6.3'
           host: linux
           target: desktop
-          cached: ${{ steps.cache-qt.outputs.cache-hit }}
+          cache: true
 
-      # Cache ccache directory separately for C++ compilation caching
+      # Cache ccache directory for C++ compilation caching
       # This dramatically speeds up rebuilds by caching compiled object files
       - name: Cache ccache
         uses: actions/cache@v4

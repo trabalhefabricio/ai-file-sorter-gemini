@@ -9,9 +9,9 @@ The workflows implement a multi-layered caching approach that significantly spee
 ## Linux Build Workflow (`build.yml`)
 
 ### 1. Qt Installation Cache
-- **Cache Key**: `qt-{os}-6.6.3-{workflow-hash}`
+- **Built-in caching**: Uses `jurplel/install-qt-action@v3` with `cache: true`
 - **Purpose**: Qt is ~1GB and takes several minutes to download and install
-- **Invalidation**: Changes to the workflow file trigger a fresh installation
+- **Managed by**: The Qt action handles caching automatically
 - **Impact**: Saves 3-5 minutes per build
 
 ### 2. ccache (Compiler Cache)
