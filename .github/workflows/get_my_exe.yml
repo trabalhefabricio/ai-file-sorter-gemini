@@ -320,9 +320,11 @@ jobs:
           $qtBinPath = "$env:Qt6_DIR\bin"
           if (-not (Test-Path $qtBinPath)) {
             # Fallback: try to find Qt installation
-            $qtBinPath = (Get-Command windeployqt -ErrorAction SilentlyContinue).Source
-            if ($qtBinPath) {
-              $qtBinPath = Split-Path $qtBinPath -Parent
+            $windeployqtCmd = Get-Command windeployqt -ErrorAction SilentlyContinue
+            if ($windeployqtCmd -and $windeployqtCmd.Source) {
+              $qtBinPath = Split-Path $windeployqtCmd.Source -Parent
+            } else {
+              $qtBinPath = $null
             }
           }
 
@@ -332,7 +334,7 @@ jobs:
           }
 
           # Run windeployqt
-          $exePath = Get-Item "output\*.exe" | Select-Object -First 1
+          $exePath = Get-Item "output\*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($exePath) {
             Write-Host "Running windeployqt for: $($exePath.FullName)"
             & windeployqt --release --dir output $exePath.FullName
