@@ -62,7 +62,7 @@ void UiTranslator::translate_primary_controls(bool analysis_in_progress) const
         label->setText(tr("Folder:"));
     }
     if (auto* button = raw_ptr(deps_.primary.browse_button)) {
-        button->setText(tr("Browse…"));
+        button->setText(tr("Browse..."));
     }
     if (auto* checkbox = raw_ptr(deps_.primary.use_subcategories_checkbox)) {
         checkbox->setText(tr("Use subcategories"));
@@ -222,9 +222,9 @@ void UiTranslator::translate_status_messages(const State& state) const
 
     if (state.analysis_in_progress) {
         if (state.stop_analysis_requested) {
-            bar->showMessage(tr("Cancelling analysis…"), 4000);
+            bar->showMessage(tr("Cancelling analysis..."), 4000);
         } else {
-            bar->showMessage(tr("Analyzing…"));
+            bar->showMessage(tr("Analyzing..."));
         }
     } else if (state.status_is_ready) {
         bar->showMessage(tr("Ready"));
