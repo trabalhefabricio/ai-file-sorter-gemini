@@ -79,6 +79,7 @@ private:
     QLabel* preview_area_;
     QLabel* file_info_label_;
     QLabel* file_name_label_;
+    QLabel* stats_summary_label_;  // New: shows keep/delete/ignore counts
     QProgressBar* progress_bar_;
     
     QPushButton* keep_button_;

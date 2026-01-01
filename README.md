@@ -159,9 +159,11 @@ See [CHANGELOG.md](CHANGELOG.md) for the full history.
   - Automatic tracking of all API calls
   - Color-coded quota warnings
 
-- 🎯 **File Tinder Tool** (Tools → File Tinder): Swipe-style file cleanup with keyboard shortcuts
-  - Quick review interface: V (keep), X (delete), I (ignore), R (revert)
+- 🎯 **File Tinder Tool** (Tools → File Tinder): Swipe-style file cleanup with arrow key navigation
+  - Quick review interface: → (keep), ← (delete), ↓ (skip), ↑ (back)
   - File previews (images, text, metadata)
+  - Enhanced progress bar with percentage and statistics
+  - Real-time decision counters (keep/delete/skip)
   - Session save/resume functionality
   - Safety review before deletion
   - Progress tracking

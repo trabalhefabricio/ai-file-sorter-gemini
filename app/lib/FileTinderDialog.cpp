@@ -32,6 +32,15 @@ FileTinderDialog::FileTinderDialog(const std::string& folder_path,
 void FileTinderDialog::setup_ui() {
     auto* main_layout = new QVBoxLayout(this);
     
+    // Statistics summary at top
+    stats_summary_label_ = new QLabel(this);
+    stats_summary_label_->setAlignment(Qt::AlignCenter);
+    QFont stats_font;
+    stats_font.setPointSize(11);
+    stats_summary_label_->setFont(stats_font);
+    stats_summary_label_->setStyleSheet("QLabel { color: #555; padding: 5px; }");
+    main_layout->addWidget(stats_summary_label_);
+    
     // File name label at top
     file_name_label_ = new QLabel(this);
     QFont title_font;
@@ -60,36 +69,53 @@ void FileTinderDialog::setup_ui() {
     
     main_layout->addWidget(preview_scroll, 1);  // Stretch factor 1
     
-    // Progress bar
+    // Progress bar with better styling
     progress_bar_ = new QProgressBar(this);
     progress_bar_->setTextVisible(true);
-    progress_bar_->setFormat(tr("%v / %m files reviewed"));
+    progress_bar_->setFormat(tr("Progress: %v / %m files (%p%)"));
+    progress_bar_->setMinimumHeight(30);
+    QFont progress_font;
+    progress_font.setPointSize(10);
+    progress_bar_->setFont(progress_font);
+    progress_bar_->setStyleSheet(
+        "QProgressBar {"
+        "    border: 2px solid #ccc;"
+        "    border-radius: 5px;"
+        "    text-align: center;"
+        "    background-color: #f0f0f0;"
+        "}"
+        "QProgressBar::chunk {"
+        "    background-color: #4CAF50;"
+        "    border-radius: 3px;"
+        "}"
+    );
     main_layout->addWidget(progress_bar_);
     
     // Button layout
     auto* button_layout = new QHBoxLayout();
     
-    // Revert button (left side)
-    revert_button_ = new QPushButton(tr("← Back (R)"), this);
-    revert_button_->setToolTip(tr("Undo last decision (R key)"));
+    // Revert button (left side) - Up Arrow
+    revert_button_ = new QPushButton(tr("↑ Back"), this);
+    revert_button_->setToolTip(tr("Undo last decision (↑ Up Arrow key)"));
+    revert_button_->setStyleSheet("QPushButton { font-size: 16px; padding: 15px 30px; }");
     button_layout->addWidget(revert_button_);
     
     button_layout->addStretch();
     
     // Main action buttons
-    delete_button_ = new QPushButton(tr("✗ Delete (X)"), this);
+    delete_button_ = new QPushButton(tr("← Delete"), this);
     delete_button_->setStyleSheet("QPushButton { background-color: #ef5350; color: white; font-size: 16px; padding: 15px 30px; }");
-    delete_button_->setToolTip(tr("Mark for deletion (X key)"));
+    delete_button_->setToolTip(tr("Mark for deletion (← Left Arrow key)"));
     button_layout->addWidget(delete_button_);
     
-    ignore_button_ = new QPushButton(tr("↓ Skip (I)"), this);
+    ignore_button_ = new QPushButton(tr("↓ Skip"), this);
     ignore_button_->setStyleSheet("QPushButton { font-size: 16px; padding: 15px 30px; }");
-    ignore_button_->setToolTip(tr("Ignore this file (I key)"));
+    ignore_button_->setToolTip(tr("Ignore this file (↓ Down Arrow key)"));
     button_layout->addWidget(ignore_button_);
     
-    keep_button_ = new QPushButton(tr("✓ Keep (V)"), this);
+    keep_button_ = new QPushButton(tr("→ Keep"), this);
     keep_button_->setStyleSheet("QPushButton { background-color: #66bb6a; color: white; font-size: 16px; padding: 15px 30px; }");
-    keep_button_->setToolTip(tr("Keep this file (V key)"));
+    keep_button_->setToolTip(tr("Keep this file (→ Right Arrow key)"));
     button_layout->addWidget(keep_button_);
     
     button_layout->addStretch();
@@ -284,6 +310,27 @@ void FileTinderDialog::move_to_next_file() {
 
 void FileTinderDialog::update_progress() {
     progress_bar_->setValue(current_index_);
+    
+    // Update statistics summary
+    int keep_count = 0;
+    int delete_count = 0;
+    int ignore_count = 0;
+    
+    for (const auto& file : files_) {
+        switch (file.decision) {
+            case Decision::Keep: keep_count++; break;
+            case Decision::Delete: delete_count++; break;
+            case Decision::Ignore: ignore_count++; break;
+            default: break;
+        }
+    }
+    
+    stats_summary_label_->setText(
+        tr("✓ Keep: %1  |  ✗ Delete: %2  |  ↓ Skip: %3")
+            .arg(keep_count)
+            .arg(delete_count)
+            .arg(ignore_count)
+    );
 }
 
 void FileTinderDialog::on_finish_review() {
@@ -437,16 +484,16 @@ void FileTinderDialog::load_state() {
 
 void FileTinderDialog::keyPressEvent(QKeyEvent* event) {
     switch (event->key()) {
-        case Qt::Key_V:
+        case Qt::Key_Right:  // → Keep
             on_keep_file();
             break;
-        case Qt::Key_X:
+        case Qt::Key_Left:   // ← Delete
             on_delete_file();
             break;
-        case Qt::Key_I:
+        case Qt::Key_Down:   // ↓ Skip/Ignore
             on_ignore_file();
             break;
-        case Qt::Key_R:
+        case Qt::Key_Up:     // ↑ Back/Revert
             on_revert_decision();
             break;
         default:
