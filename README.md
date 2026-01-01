@@ -420,7 +420,9 @@ Option B - CMake + Qt online installer
    ```
 
 Notes
+- **Important**: After pulling updates or running `git submodule update`, always rebuild the llama library **before** rebuilding the application. The llama.cpp submodule is actively developed and the application expects the DLL to match the submodule version. See the [Troubleshooting](#troubleshooting) section if you encounter DLL entry point errors.
 - To rebuild from scratch, run `.\app\build_windows.ps1 -Clean`. The script removes the local `app\build-windows` directory before configuring.
+- To force a clean llama rebuild, delete `app\include\external\llama.cpp\build` and `app\lib\precompiled\cpu` before running `build_llama_windows.ps1`.
 - Runtime DLLs are copied automatically via `windeployqt` after each successful build; skip this step with `-SkipDeploy` if you manage deployment yourself.
 - If Visual Studio sets `VCPKG_ROOT` to its bundled copy under `Program Files`, clone vcpkg to a writable directory (for example `C:\dev\vcpkg`) and pass `vcpkgroot=<path>` when running `build_llama_windows.ps1`.
 - If you plan to ship CUDA or Vulkan acceleration, run the `build_llama_*` helper for each backend you intend to include before configuring CMake so the libraries exist. The runtime can carry both and auto-select at launch, so CUDA remains optional.
@@ -460,6 +462,49 @@ When no flags are provided the app auto-detects available runtimes in priority o
 - **macOS**: `cd app && sudo make uninstall`
 
 The command removes the executable and the staged precompiled libraries. You can also delete cached local LLM models in `~/.local/share/aifilesorter/llms` (Linux) or `~/Library/Application Support/aifilesorter/llms` (macOS) if you no longer need them.
+
+---
+
+## Troubleshooting
+
+### Windows DLL Entry Point Errors
+
+If you encounter errors like:
+- `Não foi possível localizar o ponto de entrada do procedimento ggml_xielu na biblioteca de vínculo dinâmico llama.dll`
+- `Could not locate the entry point for procedure ggml_xielu in the dynamic link library llama.dll`
+- `Could not locate the entry point for procedure QTableView::dropEvent in aifilesorter.exe`
+
+These errors indicate a version mismatch between the application and its dependencies:
+
+**For `ggml_xielu` errors:**
+1. The llama.cpp submodule has been updated but the prebuilt `llama.dll` is from an older version
+2. **Solution for local builds**: Rebuild the llama library:
+   ```powershell
+   # Delete the old build cache
+   Remove-Item -Recurse -Force app\include\external\llama.cpp\build
+   Remove-Item -Recurse -Force app\lib\precompiled\cpu
+   Remove-Item -Recurse -Force app\lib\ggml
+   
+   # Rebuild llama with the current submodule version
+   app\scripts\build_llama_windows.ps1 cuda=off vulkan=off vcpkgroot=C:\dev\vcpkg
+   
+   # Rebuild the application
+   app\build_windows.ps1 -Configuration Release -VcpkgRoot C:\dev\vcpkg
+   ```
+3. **Solution for downloaded binaries**: Wait for an updated release, or build from source using the instructions above
+
+**For Qt-related errors (QTableView::dropEvent):**
+1. This usually indicates a Qt version mismatch between build and runtime
+2. **Solution**: Ensure you're using the same Qt version that was used to build the application
+   - For source builds: Use Qt 6.5.3+ (matching the build instructions)
+   - For downloaded binaries: Install the Microsoft Visual C++ Redistributable packages
+   - Try reinstalling or updating Qt runtime libraries
+
+**General troubleshooting:**
+- Update to the latest release version
+- If building from source, always run `git submodule update --init --recursive` after pulling new changes
+- After updating submodules, always rebuild the llama library before rebuilding the app
+- Check that all required DLLs are present in the application directory
 
 ---
 

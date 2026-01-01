@@ -13,6 +13,8 @@
 #include <QObject>
 #include <QStringList>
 
+#include "DllVersionChecker.hpp"
+
 #include <cstdlib>
 
 #include <windows.h>
@@ -548,17 +550,38 @@ QStringList build_forwarded_args(int argc, char* argv[], bool &console_log_flag)
 {
     QStringList forwardedArgs;
     console_log_flag = false;
+    
+    // List of flag prefixes that should not be forwarded (handled by starter only)
+    static const QStringList excludedPrefixes = {
+        QStringLiteral("--cuda="),
+        QStringLiteral("--vulkan=")
+    };
+    
     for (int i = 1; i < argc; ++i) {
         const QString arg = QString::fromLocal8Bit(argv[i]);
+        
+        // Check for console-log flag
         if (arg == QStringLiteral("--console-log")) {
             console_log_flag = true;
         }
-        forwardedArgs.append(arg);
+        
+        // Skip backend override flags - they're for the starter, not the main app
+        bool shouldExclude = false;
+        for (const QString& prefix : excludedPrefixes) {
+            if (arg.startsWith(prefix)) {
+                shouldExclude = true;
+                break;
+            }
+        }
+        
+        if (!shouldExclude) {
+            forwardedArgs.append(arg);
+        }
     }
+    
+    // Always add --allow-direct-launch to indicate app was launched via starter
     forwardedArgs.prepend(QStringLiteral("--allow-direct-launch"));
-    if (console_log_flag && !forwardedArgs.contains(QStringLiteral("--console-log"))) {
-        forwardedArgs.append(QStringLiteral("--console-log"));
-    }
+    
     return forwardedArgs;
 }
 
@@ -580,6 +603,83 @@ QString llama_device_for_selection(BackendSelection selection)
         case BackendSelection::Cpu:
         default: return QString();
     }
+}
+
+bool check_dll_compatibility(const QString& ggmlPath, const QString& exeDir) {
+    // Check llama.dll and ggml.dll for required exports
+    QStringList dllsToCheck;
+    
+    // Check in the ggml runtime directory
+    if (!ggmlPath.isEmpty()) {
+        dllsToCheck << QDir(ggmlPath).filePath("llama.dll");
+        dllsToCheck << QDir(ggmlPath).filePath("ggml.dll");
+    }
+    
+    // Check in precompiled/cpu/bin
+    QString precompiledDir = QDir(exeDir).filePath("lib/precompiled/cpu/bin");
+    dllsToCheck << QDir(precompiledDir).filePath("llama.dll");
+    dllsToCheck << QDir(precompiledDir).filePath("ggml.dll");
+    
+    bool foundAnyDll = false;
+    bool hasIncompatibleDll = false;
+    QStringList incompatibleDlls;
+    QStringList missingSymbols;
+    
+    for (const QString& dllPath : dllsToCheck) {
+        if (!QFileInfo::exists(dllPath)) {
+            continue;
+        }
+        
+        foundAnyDll = true;
+        qInfo().noquote() << "Checking DLL compatibility:" << QDir::toNativeSeparators(dllPath);
+        
+        DllVersionChecker::CheckResult result = DllVersionChecker::checkLlamaDllCompatibility(dllPath);
+        
+        if (!result.isCompatible && !result.missingSymbols.isEmpty()) {
+            hasIncompatibleDll = true;
+            incompatibleDlls.append(QFileInfo(dllPath).fileName());
+            for (const QString& symbol : result.missingSymbols) {
+                if (!missingSymbols.contains(symbol)) {
+                    missingSymbols.append(symbol);
+                }
+            }
+            qWarning().noquote() << "DLL version mismatch detected:" << result.errorMessage;
+        } else if (result.isCompatible) {
+            qInfo().noquote() << "DLL compatibility check passed for" << QFileInfo(dllPath).fileName();
+        }
+    }
+    
+    if (!foundAnyDll) {
+        qWarning() << "No llama/ggml DLLs found to check";
+        return true; // Can't check, proceed anyway
+    }
+    
+    if (hasIncompatibleDll) {
+        QString message = QString(
+            "DLL Version Mismatch Detected\n\n"
+            "The following DLL(s) are outdated and missing required functions:\n"
+            "%1\n\n"
+            "Missing exports: %2\n\n"
+            "This will cause \"entry point not found\" errors at runtime.\n\n"
+            "Solutions:\n"
+            "1. If you built from source: Rebuild llama.dll using:\n"
+            "   app\\scripts\\build_llama_windows.ps1\n\n"
+            "2. If using prebuilt binaries: Download the latest version\n\n"
+            "Do you want to continue anyway? (Not recommended)"
+        ).arg(incompatibleDlls.join(", ")).arg(missingSymbols.join(", "));
+        
+        auto response = QMessageBox::warning(
+            nullptr,
+            QObject::tr("DLL Version Mismatch"),
+            message,
+            QMessageBox::Ignore | QMessageBox::Abort,
+            QMessageBox::Abort
+        );
+        
+        return (response == QMessageBox::Ignore);
+    }
+    
+    return true;
 }
 
 bool launch_main_process(const QString& mainExecutable,
@@ -646,29 +746,42 @@ int main(int argc, char* argv[]) {
             << "Backend runtime directory missing for selection" << ggmlVariant
             << "- attempting fallback.";
 
-        BackendSelection fallbackSelection = BackendSelection::Cpu;
-        if (selection == BackendSelection::Vulkan && availability.cudaAvailable) {
-            fallbackSelection = BackendSelection::Cuda;
-        } else if (selection == BackendSelection::Cuda && availability.vulkanAvailable) {
-            fallbackSelection = BackendSelection::Vulkan;
+        // BUG FIX: Track fallback attempts to prevent infinite loop
+        int fallbackAttempts = 0;
+        const int maxFallbackAttempts = 2; // Vulkan -> CUDA -> CPU (max 2 transitions)
+
+        while (ggmlPath.isEmpty() && fallbackAttempts < maxFallbackAttempts) {
+            fallbackAttempts++;
+            
+            BackendSelection fallbackSelection = BackendSelection::Cpu;
+            if (selection == BackendSelection::Vulkan && availability.cudaAvailable) {
+                fallbackSelection = BackendSelection::Cuda;
+            } else if (selection == BackendSelection::Cuda && availability.vulkanAvailable) {
+                fallbackSelection = BackendSelection::Vulkan;
+            }
+
+            if (fallbackSelection != selection) {
+                qInfo().noquote()
+                    << "Falling back to backend"
+                    << backend_tag_for_selection(fallbackSelection)
+                    << "due to missing runtime directory.";
+                selection = fallbackSelection;
+                ggmlVariant = ggml_variant_for_selection(selection);
+            } else {
+                qInfo().noquote() << "Falling back to CPU backend.";
+                selection = BackendSelection::Cpu;
+                ggmlVariant = ggml_variant_for_selection(selection);
+            }
+
+            ggmlPath = resolve_ggml_directory(exeDir, ggmlVariant, /*showError=*/false);
         }
 
-        if (fallbackSelection != selection) {
-            qInfo().noquote()
-                << "Falling back to backend"
-                << backend_tag_for_selection(fallbackSelection)
-                << "due to missing runtime directory.";
-            selection = fallbackSelection;
-            ggmlVariant = ggml_variant_for_selection(selection);
-        } else {
-            qInfo().noquote() << "Falling back to CPU backend.";
-            selection = BackendSelection::Cpu;
-            ggmlVariant = ggml_variant_for_selection(selection);
-        }
-
-        ggmlPath = resolve_ggml_directory(exeDir, ggmlVariant, /*showError=*/true);
         if (ggmlPath.isEmpty()) {
-            return EXIT_FAILURE;
+            // Final attempt with error message
+            ggmlPath = resolve_ggml_directory(exeDir, ggmlVariant, /*showError=*/true);
+            if (ggmlPath.isEmpty()) {
+                return EXIT_FAILURE;
+            }
         }
     }
 
@@ -678,14 +791,32 @@ int main(int argc, char* argv[]) {
     const bool useVulkan = (selection == BackendSelection::Vulkan);
     configure_runtime_paths(exeDir, ggmlPath, secureSearchEnabled, useCuda, useVulkan);
 
+    // NEW: Check DLL compatibility before launching
+    if (!check_dll_compatibility(ggmlPath, exeDir)) {
+        qInfo() << "User aborted due to DLL version mismatch";
+        return EXIT_FAILURE;
+    }
+
     bool console_log_flag = false;
     QStringList forwardedArgs = build_forwarded_args(argc, argv, console_log_flag);
     if (console_log_flag) {
-        AttachConsole(ATTACH_PARENT_PROCESS);
-        FILE* f = nullptr;
-        freopen_s(&f, "CONOUT$", "w", stdout);
-        freopen_s(&f, "CONOUT$", "w", stderr);
-        freopen_s(&f, "CONIN$", "r", stdin);
+        if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+            FILE* f = nullptr;
+            // BUG FIX: Check return values of freopen_s to avoid silent failures
+            if (freopen_s(&f, "CONOUT$", "w", stdout) != 0 || f == nullptr) {
+                qWarning() << "Failed to redirect stdout to console";
+            }
+            f = nullptr;
+            if (freopen_s(&f, "CONOUT$", "w", stderr) != 0 || f == nullptr) {
+                qWarning() << "Failed to redirect stderr to console";
+            }
+            f = nullptr;
+            if (freopen_s(&f, "CONIN$", "r", stdin) != 0 || f == nullptr) {
+                qWarning() << "Failed to redirect stdin from console";
+            }
+        } else {
+            qWarning() << "Failed to attach to parent console";
+        }
     }
 
     const QString mainExecutable = resolveExecutableName(exeDir);
