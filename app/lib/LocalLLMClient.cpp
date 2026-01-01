@@ -31,6 +31,7 @@
 #include <string_view>
 #include <string>
 #include <array>
+#include <mutex>
 
 using namespace ErrorCodes;
 
@@ -208,7 +209,11 @@ bool is_probably_integrated_gpu(ggml_backend_dev_t device,
 }
 
 void load_ggml_backends_once(const std::shared_ptr<spdlog::logger>& logger) {
+    // BUG FIX: Add mutex to prevent race condition when called from multiple threads
+    static std::mutex init_mutex;
     static bool loaded = false;
+    
+    std::lock_guard<std::mutex> lock(init_mutex);
     if (loaded) {
         return;
     }
