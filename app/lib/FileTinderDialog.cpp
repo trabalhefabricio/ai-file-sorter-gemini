@@ -249,7 +249,7 @@ void FileTinderDialog::preview_file(const std::string& path) {
             .arg(file_info.fileName())
             .arg(format_file_size(file_info.size()))
             .arg(suffix.isEmpty() ? tr("(no extension)") : suffix)
-            .arg(QLocale().toString(file_info.lastModified()));
+            .arg(QLocale::system().toString(file_info.lastModified()));
         preview_area_->setText(info);
         preview_area_->setAlignment(Qt::AlignCenter);
     }
