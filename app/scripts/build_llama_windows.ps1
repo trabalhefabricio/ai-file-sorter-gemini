@@ -409,3 +409,23 @@ New-Item -ItemType Directory -Force -Path $headersDir | Out-Null
 Copy-Item "$llamaDir\include\llama.h" -Destination $headersDir
 Copy-Item "$llamaDir\ggml\src\*.h" -Destination $headersDir -ErrorAction SilentlyContinue
 Copy-Item "$llamaDir\ggml\include\*.h" -Destination $headersDir -ErrorAction SilentlyContinue
+
+# --- Success message with version info ---
+Push-Location $llamaDir
+$llamaVersion = & git describe --tags --always 2>$null
+if (-not $llamaVersion) { $llamaVersion = "unknown" }
+$llamaCommit = & git rev-parse --short HEAD 2>$null
+if (-not $llamaCommit) { $llamaCommit = "unknown" }
+Pop-Location
+
+Write-Output "`n========================================`n"
+Write-Output "[SUCCESS] Llama.cpp build completed!"
+Write-Output "  Version: $llamaVersion"
+Write-Output "  Commit:  $llamaCommit"
+Write-Output "  Variant: $variant"
+Write-Output "  Output:  $variantRoot"
+Write-Output "`nIMPORTANT: This llama.dll is tied to the current llama.cpp"
+Write-Output "submodule version ($llamaCommit). If you update the submodule"
+Write-Output "in the future, you MUST rebuild the library by running this"
+Write-Output "script again to avoid 'entry point not found' errors.`n"
+Write-Output "========================================`n"

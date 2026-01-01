@@ -16,6 +16,15 @@ jobs:
         with:
           submodules: recursive
 
+      # Get the llama.cpp submodule commit hash for cache invalidation
+      - name: Get Llama.cpp Submodule Commit
+        id: llama-commit
+        shell: powershell
+        run: |
+          $commitHash = git rev-parse HEAD:app/include/external/llama.cpp
+          echo "hash=$commitHash" >> $env:GITHUB_OUTPUT
+          Write-Host "Llama.cpp submodule commit: $commitHash"
+
       # Enable GitHub Actions cache for vcpkg binary caching
       # This allows vcpkg to use GitHub's cache as a binary cache backend
       - name: Enable GitHub Cache
@@ -137,7 +146,8 @@ jobs:
 
       # Cache Llama.cpp build artifacts (most time-consuming build step)
       # Building llama.cpp from source can take 15-30 minutes
-      # Cache key includes source files to invalidate when llama.cpp is updated
+      # Cache key includes the llama.cpp submodule commit hash to ensure cache is invalidated
+      # when the submodule is updated to a different commit
       - name: Cache Llama Build
         id: cache-llama
         uses: actions/cache@v4
@@ -147,7 +157,7 @@ jobs:
             app/lib/precompiled/cpu
             app/lib/ggml
             app/include/llama
-          key: llama-build-${{ runner.os }}-${{ hashFiles('app/include/external/llama.cpp/**/*.cpp', 'app/include/external/llama.cpp/**/*.h', 'app/include/external/llama.cpp/**/*.cmake') }}
+          key: llama-build-${{ runner.os }}-${{ steps.llama-commit.outputs.hash }}
           restore-keys: |
             llama-build-${{ runner.os }}-
 
@@ -209,6 +219,32 @@ jobs:
                           "Check the 'Build Llama Engine' step logs for errors.")
             }
             exit 1
+          }
+
+          # Verify that the DLL exports the required symbols (like ggml_xielu)
+          # This helps catch version mismatches early
+          $dumpbinPath = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe"
+          $dumpbin = Get-Item $dumpbinPath -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $dumpbin) {
+            # Try Community edition path
+            $dumpbinPath = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe"
+            $dumpbin = Get-Item $dumpbinPath -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
+          
+          if ($dumpbin) {
+            Write-Host "`nVerifying DLL exports..."
+            $ggmlDllPath = Join-Path "$precompiledDir\bin" "ggml.dll"
+            $exports = & $dumpbin.FullName /EXPORTS $ggmlDllPath 2>&1 | Out-String
+            
+            # Check for ggml_xielu which was added in recent versions
+            if ($exports -match "ggml_xielu") {
+              Write-Host "[OK] ggml.dll exports ggml_xielu (version check passed)"
+            } else {
+              Write-Warning "ggml.dll does not export ggml_xielu - this may indicate an old version"
+              Write-Warning "The application may fail at runtime with 'entry point not found' errors"
+            }
+          } else {
+            Write-Host "[SKIP] Could not find dumpbin.exe - skipping DLL export verification"
           }
 
           if ("${{ steps.cache-llama.outputs.cache-hit }}" -eq "true") {
