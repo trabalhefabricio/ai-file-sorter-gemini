@@ -55,7 +55,7 @@ private:
     QWidget* gemini_tab_;
     QLabel* gemini_requests_today_;
     QLabel* gemini_remaining_;
-    QLabel* gemini_quota_bar_;
+    QProgressBar* gemini_quota_bar_;  // Changed from QLabel to QProgressBar
     QTableWidget* gemini_history_table_;
     
     QPushButton* refresh_button_;

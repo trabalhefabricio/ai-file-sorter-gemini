@@ -112,7 +112,9 @@ void FileTinderDialog::setup_ui() {
 void FileTinderDialog::load_files() {
     QDir dir(QString::fromStdString(folder_path_));
     if (!dir.exists()) {
-        app_log(spdlog::level::err, "Folder does not exist: {}", folder_path_);
+        if (auto logger = Logger::get_logger("core_logger")) {
+            logger->error("Folder does not exist: {}", folder_path_);
+        }
         return;
     }
     
@@ -133,7 +135,9 @@ void FileTinderDialog::load_files() {
     progress_bar_->setMaximum(files_.size());
     progress_bar_->setValue(0);
     
-    app_log(spdlog::level::info, "Loaded {} files for File Tinder review", files_.size());
+    if (auto logger = Logger::get_logger("core_logger")) {
+        logger->info("Loaded {} files for File Tinder review", files_.size());
+    }
 }
 
 void FileTinderDialog::show_current_file() {
@@ -224,7 +228,9 @@ void FileTinderDialog::on_keep_file() {
     if (current_index_ >= files_.size()) return;
     
     files_[current_index_].decision = Decision::Keep;
-    app_log(spdlog::level::debug, "Marked file as KEEP: {}", files_[current_index_].file_name);
+    if (auto logger = Logger::get_logger("core_logger")) {
+        logger->debug("Marked file as KEEP: {}", files_[current_index_].file_name);
+    }
     
     save_state();
     move_to_next_file();
@@ -234,7 +240,9 @@ void FileTinderDialog::on_delete_file() {
     if (current_index_ >= files_.size()) return;
     
     files_[current_index_].decision = Decision::Delete;
-    app_log(spdlog::level::debug, "Marked file as DELETE: {}", files_[current_index_].file_name);
+    if (auto logger = Logger::get_logger("core_logger")) {
+        logger->debug("Marked file as DELETE: {}", files_[current_index_].file_name);
+    }
     
     save_state();
     move_to_next_file();
@@ -244,7 +252,9 @@ void FileTinderDialog::on_ignore_file() {
     if (current_index_ >= files_.size()) return;
     
     files_[current_index_].decision = Decision::Ignore;
-    app_log(spdlog::level::debug, "Marked file as IGNORE: {}", files_[current_index_].file_name);
+    if (auto logger = Logger::get_logger("core_logger")) {
+        logger->debug("Marked file as IGNORE: {}", files_[current_index_].file_name);
+    }
     
     save_state();
     move_to_next_file();
@@ -259,7 +269,9 @@ void FileTinderDialog::on_revert_decision() {
     // Reset its decision to pending
     files_[current_index_].decision = Decision::Pending;
     
-    app_log(spdlog::level::debug, "Reverted decision for: {}", files_[current_index_].file_name);
+    if (auto logger = Logger::get_logger("core_logger")) {
+        logger->debug("Reverted decision for: {}", files_[current_index_].file_name);
+    }
     
     save_state();
     show_current_file();
@@ -336,12 +348,16 @@ void FileTinderDialog::on_execute_deletions() {
             QFile qfile(QString::fromStdString(file.path));
             if (qfile.remove()) {
                 deleted_count++;
-                app_log(spdlog::level::info, "Deleted file: {}", file.path);
+                if (auto logger = Logger::get_logger("core_logger")) {
+                    logger->info("Deleted file: {}", file.path);
+                }
             } else {
                 failed_count++;
                 QString error = tr("Failed to delete: %1\n").arg(QString::fromStdString(file.file_name));
                 error_messages += error;
-                app_log(spdlog::level::err, "Failed to delete file: {}", file.path);
+                if (auto logger = Logger::get_logger("core_logger")) {
+                    logger->error("Failed to delete file: {}", file.path);
+                }
             }
         }
     }

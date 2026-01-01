@@ -28,10 +28,14 @@ void APIUsageTracker::record_request(const std::string& provider,
     float cost = estimate_cost(model, tokens);
     
     if (!db_.record_api_usage(provider, tokens, 1, cost)) {
-        app_log(spdlog::level::warn, "Failed to record API usage for {}", provider);
+        if (auto logger = Logger::get_logger("core_logger")) {
+            logger->warn("Failed to record API usage for {}", provider);
+        }
     } else {
-        app_log(spdlog::level::debug, "Recorded {} API usage: {} tokens, ${:.4f}", 
-                provider, tokens, cost);
+        if (auto logger = Logger::get_logger("core_logger")) {
+            logger->debug("Recorded {} API usage: {} tokens, ${:.4f}", 
+                    provider, tokens, cost);
+        }
     }
 }
 
@@ -113,6 +117,8 @@ float APIUsageTracker::estimate_cost(const std::string& model, int tokens) {
     }
     
     // Default to a conservative estimate if unknown
-    app_log(spdlog::level::warn, "Unknown model '{}' for cost estimation, using default", model);
+    if (auto logger = Logger::get_logger("core_logger")) {
+        logger->warn("Unknown model '{}' for cost estimation, using default", model);
+    }
     return (tokens / 1000000.0f) * 1.0f;  // Default $1 per 1M tokens
 }

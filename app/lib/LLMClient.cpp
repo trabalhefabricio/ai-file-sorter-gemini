@@ -4,6 +4,7 @@
 #include <AppException.hpp>
 #include <ErrorCode.hpp>
 #include <DatabaseManager.hpp>
+#include <APIUsageTracker.hpp>
 #include <curl/curl.h>
 #include <json/json.h>
 #include <spdlog/spdlog.h>
@@ -523,7 +524,8 @@ std::string LLMClient::send_api_request(std::string json_payload) {
     
     // Record API usage for tracking
     if (db_manager && total_tokens > 0) {
-        if (!db_manager->record_api_usage("openai", total_tokens, 1, 0.0f)) {
+        float cost = APIUsageTracker::estimate_cost(effective_model(), total_tokens);
+        if (!db_manager->record_api_usage("openai", total_tokens, 1, cost)) {
             // Log warning but don't fail the request
             if (auto logger = Logger::get_logger("core_logger")) {
                 logger->warn("Failed to record OpenAI API usage");

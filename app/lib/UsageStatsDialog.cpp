@@ -92,14 +92,12 @@ void UsageStatsDialog::setup_ui() {
     gemini_today_layout->addWidget(gemini_remaining_, 1, 1);
     
     gemini_today_layout->addWidget(new QLabel(tr("Daily Quota:"), gemini_today_group), 2, 0);
-    auto* quota_progress = new QProgressBar(gemini_today_group);
-    quota_progress->setRange(0, 1500);
-    quota_progress->setValue(0);
-    quota_progress->setTextVisible(true);
-    quota_progress->setFormat("%v / %m");
-    gemini_today_layout->addWidget(quota_progress, 2, 1);
-    gemini_quota_bar_ = new QLabel();  // Store reference for updates
-    gemini_quota_bar_->hide();  // We use the progress bar instead
+    gemini_quota_bar_ = new QProgressBar(gemini_today_group);
+    gemini_quota_bar_->setRange(0, 1500);
+    gemini_quota_bar_->setValue(0);
+    gemini_quota_bar_->setTextVisible(true);
+    gemini_quota_bar_->setFormat("%v / %m");
+    gemini_today_layout->addWidget(gemini_quota_bar_, 2, 1);
     
     // Note about limits
     auto* note_label = new QLabel(
@@ -181,9 +179,8 @@ void UsageStatsDialog::update_gemini_stats() {
         .arg(APIUsageTracker::GEMINI_FREE_RPD));
     
     // Update progress bar
-    auto* quota_progress = gemini_tab_->findChild<QProgressBar*>();
-    if (quota_progress) {
-        quota_progress->setValue(stats.requests_today);
+    if (gemini_quota_bar_) {
+        gemini_quota_bar_->setValue(stats.requests_today);
         
         // Change color based on usage
         QString style;
@@ -194,7 +191,7 @@ void UsageStatsDialog::update_gemini_stats() {
         } else {
             style = "QProgressBar::chunk { background-color: #66bb6a; }";  // Green
         }
-        quota_progress->setStyleSheet(style);
+        gemini_quota_bar_->setStyleSheet(style);
     }
     
     populate_history_table(gemini_history_table_, "gemini");
