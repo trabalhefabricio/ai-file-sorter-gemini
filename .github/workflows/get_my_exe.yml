@@ -296,29 +296,105 @@ jobs:
           Write-Host "[OK] Build successful! aifilesorter.exe created ($([math]::Round($exeSize/1MB, 2)) MB)"
 
       - name: Bundle Files
-        shell: cmd
+        shell: pwsh
         env:
           VCPKG_ROOT: ${{ github.workspace }}\vcpkg
         run: |
-          mkdir output
+          # Create output directory
+          New-Item -ItemType Directory -Force -Path "output" | Out-Null
 
-          rem Copy Main App
-          if exist build\Release\*.exe copy build\Release\*.exe output\
+          # Copy Main App
+          if (Test-Path "build\Release\*.exe") {
+            Copy-Item "build\Release\*.exe" "output\" -Force
+            Write-Host "[OK] Copied executable(s)"
+          }
 
-          rem Copy Llama DLL
-          if exist build\Release\llama.dll copy build\Release\llama.dll output\
+          # Copy Llama DLL
+          if (Test-Path "build\Release\llama.dll") {
+            Copy-Item "build\Release\llama.dll" "output\" -Force
+            Write-Host "[OK] Copied llama.dll"
+          }
 
-          rem Copy Qt DLLs
-          windeployqt --release --dir output output\*.exe
+          # Deploy Qt DLLs using windeployqt
+          # Ensure Qt bin directory is in PATH
+          $qtBinPath = "$env:Qt6_DIR\bin"
+          if (-not (Test-Path $qtBinPath)) {
+            # Fallback: try to find Qt installation
+            $qtBinPath = (Get-Command windeployqt -ErrorAction SilentlyContinue).Source
+            if ($qtBinPath) {
+              $qtBinPath = Split-Path $qtBinPath -Parent
+            }
+          }
 
-          rem Copy Support Libs
-          copy "%VCPKG_ROOT%\installed\x64-windows\bin\*.dll" output\
+          if ($qtBinPath -and (Test-Path $qtBinPath)) {
+            Write-Host "Adding Qt bin directory to PATH: $qtBinPath"
+            $env:PATH = "$qtBinPath;$env:PATH"
+          }
 
-          rem Copy OpenBLAS Dependencies
-          if exist C:\msys64\mingw64\bin\libopenblas*.dll copy C:\msys64\mingw64\bin\libopenblas*.dll output\
-          if exist C:\msys64\mingw64\bin\libgfortran*.dll copy C:\msys64\mingw64\bin\libgfortran*.dll output\
-          if exist C:\msys64\mingw64\bin\libgcc*.dll copy C:\msys64\mingw64\bin\libgcc*.dll output\
-          if exist C:\msys64\mingw64\bin\libwinpthread*.dll copy C:\msys64\mingw64\bin\libwinpthread*.dll output\
+          # Run windeployqt
+          $exePath = Get-Item "output\*.exe" | Select-Object -First 1
+          if ($exePath) {
+            Write-Host "Running windeployqt for: $($exePath.FullName)"
+            & windeployqt --release --dir output $exePath.FullName
+            
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "windeployqt failed with exit code $LASTEXITCODE"
+              exit $LASTEXITCODE
+            }
+
+            # Verify Qt DLLs were copied
+            $qtDlls = Get-ChildItem -Path "output" -Filter "Qt6*.dll" -ErrorAction SilentlyContinue
+            if ($qtDlls) {
+              Write-Host "[OK] windeployqt succeeded. Found $($qtDlls.Count) Qt DLLs:"
+              foreach ($dll in $qtDlls) {
+                Write-Host "  - $($dll.Name)"
+              }
+            } else {
+              Write-Error "windeployqt appeared to succeed but no Qt DLLs were copied to output directory"
+              exit 1
+            }
+
+            # Verify critical Qt DLLs are present
+            $criticalQtDlls = @("Qt6Core.dll", "Qt6Gui.dll", "Qt6Widgets.dll")
+            $missingQtDlls = @()
+            foreach ($dll in $criticalQtDlls) {
+              if (-not (Test-Path "output\$dll")) {
+                $missingQtDlls += $dll
+              }
+            }
+
+            if ($missingQtDlls.Count -gt 0) {
+              Write-Error "Missing critical Qt DLLs after windeployqt: $($missingQtDlls -join ', ')"
+              exit 1
+            }
+
+            Write-Host "[OK] All critical Qt DLLs verified"
+          } else {
+            Write-Error "No executable found in output directory for windeployqt"
+            exit 1
+          }
+
+          # Copy Support Libs
+          if (Test-Path "$env:VCPKG_ROOT\installed\x64-windows\bin\*.dll") {
+            Copy-Item "$env:VCPKG_ROOT\installed\x64-windows\bin\*.dll" "output\" -Force
+            Write-Host "[OK] Copied vcpkg support libraries"
+          }
+
+          # Copy OpenBLAS Dependencies
+          $openblasFiles = @(
+            "C:\msys64\mingw64\bin\libopenblas*.dll",
+            "C:\msys64\mingw64\bin\libgfortran*.dll",
+            "C:\msys64\mingw64\bin\libgcc*.dll",
+            "C:\msys64\mingw64\bin\libwinpthread*.dll"
+          )
+
+          foreach ($pattern in $openblasFiles) {
+            $files = Get-Item $pattern -ErrorAction SilentlyContinue
+            if ($files) {
+              Copy-Item $files "output\" -Force
+              Write-Host "[OK] Copied OpenBLAS dependency: $pattern"
+            }
+          }
 
       - name: Verify Bundle
         shell: powershell
