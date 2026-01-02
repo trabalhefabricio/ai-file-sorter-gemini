@@ -476,9 +476,17 @@ If you encounter errors like:
 
 These errors indicate a version mismatch between the application and its dependencies:
 
+**IMPORTANT: Always run StartAiFileSorter.exe, NOT aifilesorter.exe directly!**
+
+The `StartAiFileSorter.exe` launcher performs critical checks and setup:
+- Validates DLL compatibility before loading
+- Sets up correct DLL search paths
+- Ensures application directory DLLs are prioritized over system ones
+- Prevents conflicts with other Qt installations
+
 **For `ggml_xielu` errors:**
 1. **Important**: As of llama.cpp version b7130 (2025-11-22), `ggml_xielu` is a REQUIRED function. It's used by the Apertus model which is included in llama.dll even if you don't explicitly use it.
-2. The application now checks for this symbol at startup and will warn you if your DLLs are outdated.
+2. The application checks for this symbol at startup and will warn you if your DLLs are outdated.
 3. **Solution for local builds**: Rebuild the llama library:
    ```powershell
    # Delete the old build cache
@@ -499,15 +507,25 @@ These errors indicate a version mismatch between the application and its depende
 
 **For Qt-related errors (QTableView::dropEvent):**
 1. This indicates a Qt version mismatch between build and runtime
-2. The application now checks Qt versions at startup and will warn you if there's a mismatch
-3. **Solution**: Ensure you're using the same Qt version that was used to build the application
+2. The application checks Qt versions at startup and will warn you if there's a mismatch
+3. **Root cause**: Multiple Qt installations on your system, with system PATH pointing to wrong version
+4. **Solutions** (in order of effectiveness):
+   - **Run StartAiFileSorter.exe** instead of aifilesorter.exe directly (most important!)
+   - Check your system PATH for conflicting Qt installations and remove them
+   - Ensure you're using the same Qt version that was used to build the application
    - For source builds: Use Qt 6.5.3+ (matching the build instructions)
    - For downloaded binaries: Ensure no other Qt installations interfere with the bundled Qt DLLs
-   - Check your PATH environment variable - remove conflicting Qt installations
    - Install the Microsoft Visual C++ Redistributable packages
 
 **Automatic Version Checking:**
-- The application now performs automatic compatibility checks for both GGML and Qt DLLs at startup
+- The application performs automatic compatibility checks for both GGML and Qt DLLs at startup
+- DLL search paths are configured BEFORE loading any libraries to prevent system DLL conflicts
+- If you see a warning dialog about DLL versions, do not ignore it - follow the instructions to fix the issue
+
+**Why these errors happen:**
+- Windows loads DLLs from PATH before checking the application directory
+- Conflicting Qt or GGML libraries in system PATH cause symbol resolution errors
+- The StartAiFileSorter.exe launcher prevents these issues by setting up the environment correctly
 - If a version mismatch is detected, you'll see a detailed error message with specific instructions
 - You can choose to ignore the warning (not recommended) or abort and fix the issue
 
