@@ -16,6 +16,7 @@
 #include "DllVersionChecker.hpp"
 
 #include <cstdlib>
+#include <string>
 
 #include <windows.h>
 #ifndef DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
@@ -737,20 +738,56 @@ bool launch_main_process(const QString& mainExecutable,
 
 int main(int argc, char* argv[]) {
     enable_per_monitor_dpi_awareness();
+    
+    // CRITICAL: Set up DLL search paths BEFORE creating QApplication
+    // This prevents loading incompatible Qt DLLs from system PATH
+    const bool secureSearchEnabled = enableSecureDllSearch();
+    if (!secureSearchEnabled) {
+        // If secure search is not available, we must still try to add our directories
+        // Note: logging not available yet, will be logged later
+    }
+    
+    // Get exe directory using Win32 API (before Qt is initialized)
+    wchar_t exePath[MAX_PATH * 2]; // Use larger buffer to handle long paths
+    DWORD pathLen = GetModuleFileNameW(NULL, exePath, MAX_PATH * 2);
+    if (pathLen == 0 || pathLen >= MAX_PATH * 2) {
+        // GetModuleFileNameW failed or path was truncated
+        // Continue anyway, Qt will get the path later
+    } else {
+        std::wstring exePathStr(exePath);
+        size_t lastSlash = exePathStr.find_last_of(L"\\/");
+        std::wstring exeDirW = (lastSlash != std::wstring::npos) ? exePathStr.substr(0, lastSlash) : exePathStr;
+        
+        // Add application directory to DLL search path FIRST (before Qt loads)
+        if (secureSearchEnabled && !exeDirW.empty()) {
+            if (AddDllDirectory(exeDirW.c_str()) == nullptr) {
+                // Failed to add directory, but continue anyway
+            }
+            // Also add bin subdirectory if it exists
+            std::wstring binDir = exeDirW + L"\\bin";
+            if (GetFileAttributesW(binDir.c_str()) != INVALID_FILE_ATTRIBUTES) {
+                AddDllDirectory(binDir.c_str());
+            }
+        }
+    }
+    
+    // NOW it's safe to create QApplication
     QApplication app(argc, argv);
     app.setQuitOnLastWindowClosed(false);
 
     const QString exeDir = QCoreApplication::applicationDirPath();
     QDir::setCurrent(exeDir);
+    
+    // Log DLL search setup status
+    if (!secureSearchEnabled) {
+        qWarning() << "SetDefaultDllDirectories unavailable; relying on PATH order for DLL resolution.";
+    } else {
+        qInfo() << "Secure DLL search enabled - application directory prioritized for DLL loading";
+    }
 
     QString detectedCudaRuntime;
     const bool cudaRuntimeDetected = isCudaAvailable(&detectedCudaRuntime);
     const bool hasNvidiaDriver = isNvidiaDriverAvailable();
-
-    const bool secureSearchEnabled = enableSecureDllSearch();
-    if (!secureSearchEnabled) {
-        qWarning() << "SetDefaultDllDirectories unavailable; relying on PATH order for DLL resolution.";
-    }
 
     BackendOverrides overrides = parse_backend_overrides(argc, argv);
     log_observed_arguments(overrides.observedArgs);
