@@ -14,13 +14,24 @@ QStringList DllVersionChecker::getRequiredGgmlSymbols() {
     // ggml_xielu was added for the Apertus model support. Even if the Apertus model
     // is never used, the symbol must exist because llama.dll references it at load time.
     // Without it, Windows will refuse to load the DLL with "entry point not found" error.
+    //
+    // Note: We check for key functions across different modules to ensure compatibility:
+    // - ggml_* functions: Core GGML operations
+    // - gguf_* functions: GGUF file format support
+    // - llama_* functions: High-level llama.cpp API
     return {
+        // Core GGML functions
         "ggml_init",
         "ggml_free",
         "ggml_new_tensor",
         "ggml_backend_init",
         "ggml_backend_free",
-        "ggml_xielu"  // Required since llama.cpp b7130 (Apertus model support)
+        "ggml_xielu",  // Required since llama.cpp b7130 (Apertus model support)
+        
+        // GGUF format functions (used for loading model files)
+        "gguf_init_from_file",
+        "gguf_free",
+        "gguf_get_n_tensors"
     };
 }
 
