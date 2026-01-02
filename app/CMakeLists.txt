@@ -176,6 +176,17 @@ target_link_libraries(aifilesorter PRIVATE
 
 if(WIN32)
     target_link_libraries(aifilesorter PRIVATE ggml ggml_base ggml_cpu)
+    
+    # Use delay-loading for GGML DLLs to prevent early loading failures
+    # This allows us to check DLL compatibility before they're loaded
+    if(MSVC)
+        target_link_options(aifilesorter PRIVATE
+            /DELAYLOAD:llama.dll
+            /DELAYLOAD:ggml.dll
+            /DELAYLOAD:ggml-base.dll
+            /DELAYLOAD:ggml-cpu.dll
+        )
+    endif()
 endif()
 
 if(WIN32)

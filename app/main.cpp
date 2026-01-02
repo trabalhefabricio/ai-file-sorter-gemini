@@ -254,6 +254,30 @@ int main(int argc, char **argv) {
     ParsedArguments parsed = parse_command_line(argc, argv);
 
 #ifdef _WIN32
+    // On Windows, the application should normally be launched via StartAiFileSorter.exe
+    // which performs critical DLL compatibility checks and sets up the environment.
+    // Running aifilesorter.exe directly may result in DLL loading errors.
+    if (!allow_direct_launch(argc, argv)) {
+        // Show a warning but allow execution for backward compatibility
+        // Users who understand the risks can use --force-direct-run flag
+        const wchar_t* message = 
+            L"Warning: AI File Sorter should be launched via StartAiFileSorter.exe\n\n"
+            L"Running aifilesorter.exe directly may cause DLL compatibility errors like:\n"
+            L"- \"ggml_xielu entry point not found\"\n"
+            L"- \"QTableView::dropEvent not found\"\n\n"
+            L"To fix these errors:\n"
+            L"1. Use StartAiFileSorter.exe instead\n"
+            L"2. Ensure all DLLs are up to date\n"
+            L"3. Check that no conflicting Qt installations are in your PATH\n\n"
+            L"Continue anyway?";
+        
+        int result = MessageBoxW(NULL, message, L"AI File Sorter - Warning", 
+                                MB_ICONWARNING | MB_YESNO | MB_DEFBUTTON2);
+        if (result != IDYES) {
+            return EXIT_SUCCESS;
+        }
+    }
+    
     enable_per_monitor_dpi_awareness();
     attach_console_if_requested(parsed.console_log);
 #endif

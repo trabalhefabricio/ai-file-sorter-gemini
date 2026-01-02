@@ -171,8 +171,12 @@ DllVersionChecker::CheckResult DllVersionChecker::checkLlamaDllCompatibility(con
     CheckResult result = checkDllExports(dllPath, requiredSymbols);
     
     if (!result.isCompatible) {
-        result.errorMessage += "\n\nThis usually means the llama.dll was built with an older version of llama.cpp.\n"
-                               "The application requires llama.cpp version b7130 (2025-11-22) or later.";
+        result.errorMessage += "\n\n**This usually means the llama.dll was built with an older version of llama.cpp.**\n\n"
+                               "The application requires llama.cpp version b7130 (2025-11-22) or later.\n\n"
+                               "**How to fix:**\n"
+                               "1. Download the latest release from GitHub (includes updated DLLs)\n"
+                               "2. OR rebuild llama.dll using: app\\scripts\\build_llama_windows.ps1\n\n"
+                               "**Note:** Make sure you're running StartAiFileSorter.exe, not aifilesorter.exe directly.";
     }
     
     return result;
@@ -214,16 +218,19 @@ DllVersionChecker::CheckResult DllVersionChecker::checkQtRuntimeCompatibility() 
     if (runtimeMajor != compileMajor) {
         result.isCompatible = false;
         result.errorMessage = QString(
-            "Qt major version mismatch!\n\n"
+            "**Qt Major Version Mismatch!**\n\n"
             "Application was built with Qt %1\n"
             "But runtime is using Qt %2\n\n"
             "This causes \"entry point not found\" errors like:\n"
             "- QTableView::dropEvent not found\n"
             "- Other Qt virtual function errors\n\n"
-            "Solutions:\n"
-            "1. Ensure Qt %3 runtime DLLs are in your PATH or application directory\n"
-            "2. Reinstall Qt %3 runtime libraries\n"
-            "3. Remove conflicting Qt versions from your PATH"
+            "**How to fix:**\n"
+            "1. Make sure you're running **StartAiFileSorter.exe**, not aifilesorter.exe directly\n"
+            "2. Remove conflicting Qt installations from your system PATH\n"
+            "3. Ensure Qt %3 runtime DLLs are in the application directory\n"
+            "4. Reinstall Qt %3 runtime libraries\n"
+            "5. Check your PATH environment variable for conflicting Qt versions\n\n"
+            "**Common cause:** Multiple Qt installations on your system with different versions in PATH."
         ).arg(compileVersion).arg(runtimeVersion).arg(compileMajor);
         return result;
     }
