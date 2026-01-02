@@ -178,16 +178,6 @@ DllVersionChecker::CheckResult DllVersionChecker::checkLlamaDllCompatibility(con
     return result;
 }
 
-QStringList DllVersionChecker::getRequiredQtSymbols() {
-    // Check for symbols that indicate Qt version compatibility
-    // QTableView::dropEvent is a virtual function that must exist
-    return {
-        "dropEvent",  // Present in QTableView and other Qt widgets
-        "dragEnterEvent",
-        "dragMoveEvent"
-    };
-}
-
 DllVersionChecker::CheckResult DllVersionChecker::checkQtRuntimeCompatibility() {
     CheckResult result;
     result.isCompatible = true; // Assume compatible unless proven otherwise
@@ -209,8 +199,17 @@ DllVersionChecker::CheckResult DllVersionChecker::checkQtRuntimeCompatibility() 
         return result;
     }
     
-    int runtimeMajor = runtimeParts[0].toInt();
-    int compileMajor = compileParts[0].toInt();
+    bool runtimeMajorOk = false;
+    bool compileMajorOk = false;
+    int runtimeMajor = runtimeParts[0].toInt(&runtimeMajorOk);
+    int compileMajor = compileParts[0].toInt(&compileMajorOk);
+    
+    if (!runtimeMajorOk || !compileMajorOk) {
+        result.errorMessage = QString("Failed to parse Qt version numbers. Runtime: %1, Compile: %2")
+            .arg(runtimeVersion).arg(compileVersion);
+        result.isCompatible = false;
+        return result;
+    }
     
     if (runtimeMajor != compileMajor) {
         result.isCompatible = false;
@@ -230,11 +229,15 @@ DllVersionChecker::CheckResult DllVersionChecker::checkQtRuntimeCompatibility() 
     }
     
     // Warn if minor versions differ significantly
+    constexpr int MAX_ALLOWED_MINOR_VERSION_DIFF = 2;
     if (runtimeParts.size() >= 2 && compileParts.size() >= 2) {
-        int runtimeMinor = runtimeParts[1].toInt();
-        int compileMinor = compileParts[1].toInt();
+        bool runtimeMinorOk = false;
+        bool compileMinorOk = false;
+        int runtimeMinor = runtimeParts[1].toInt(&runtimeMinorOk);
+        int compileMinor = compileParts[1].toInt(&compileMinorOk);
         
-        if (std::abs(runtimeMinor - compileMinor) > 2) {
+        if (runtimeMinorOk && compileMinorOk && 
+            std::abs(runtimeMinor - compileMinor) > MAX_ALLOWED_MINOR_VERSION_DIFF) {
             result.errorMessage = QString(
                 "Qt minor version difference detected:\n"
                 "Built with Qt %1, running with Qt %2\n\n"

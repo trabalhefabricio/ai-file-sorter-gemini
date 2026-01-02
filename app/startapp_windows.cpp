@@ -613,10 +613,14 @@ bool check_dll_compatibility(const QString& ggmlPath, const QString& exeDir) {
     if (!qtResult.isCompatible) {
         qWarning().noquote() << "Qt version mismatch detected:" << qtResult.errorMessage;
         
+        QString qtErrorPrompt = QObject::tr(
+            "%1\n\nDo you want to continue anyway? (Not recommended)"
+        ).arg(qtResult.errorMessage);
+        
         auto response = QMessageBox::critical(
             nullptr,
             QObject::tr("Qt Version Mismatch"),
-            qtResult.errorMessage + "\n\nDo you want to continue anyway? (Not recommended)",
+            qtErrorPrompt,
             QMessageBox::Ignore | QMessageBox::Abort,
             QMessageBox::Abort
         );

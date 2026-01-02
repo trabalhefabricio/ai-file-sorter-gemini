@@ -48,12 +48,6 @@ public:
      */
     static CheckResult checkQtRuntimeCompatibility();
 
-    /**
-     * @brief Get list of critical Qt symbols that indicate version compatibility
-     * @return List of symbol names to check
-     */
-    static QStringList getRequiredQtSymbols();
-
 private:
     static bool isDumpbinAvailable();
     static QString findDumpbinPath();
