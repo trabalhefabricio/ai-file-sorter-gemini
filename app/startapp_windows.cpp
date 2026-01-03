@@ -757,15 +757,11 @@ int main(int argc, char* argv[]) {
     // Get exe directory using Win32 API (before Qt is initialized)
     wchar_t exePath[MAX_PATH * 2]; // Use larger buffer to handle long paths
     DWORD pathLen = GetModuleFileNameW(NULL, exePath, MAX_PATH * 2);
-    std::wstring exeDirW;
     
-    if (pathLen == 0 || pathLen >= MAX_PATH * 2) {
-        // GetModuleFileNameW failed or path was truncated
-        // Continue anyway, Qt will get the path later
-    } else {
+    if (pathLen > 0 && pathLen < MAX_PATH * 2) {
         std::wstring exePathStr(exePath);
         size_t lastSlash = exePathStr.find_last_of(L"\\/");
-        exeDirW = (lastSlash != std::wstring::npos) ? exePathStr.substr(0, lastSlash) : exePathStr;
+        std::wstring exeDirW = (lastSlash != std::wstring::npos) ? exePathStr.substr(0, lastSlash) : exePathStr;
         
         if (secureSearchEnabled && !exeDirW.empty()) {
             // Add application directory to DLL search path FIRST (before Qt loads)
@@ -780,16 +776,23 @@ int main(int argc, char* argv[]) {
         } else if (!exeDirW.empty()) {
             // Fallback: Prepend application directory to PATH when secure search is unavailable
             // This ensures local Qt DLLs are found before system PATH Qt DLLs
-            wchar_t pathBuffer[32768]; // Large buffer for PATH
-            DWORD pathSize = GetEnvironmentVariableW(L"PATH", pathBuffer, 32768);
+            constexpr DWORD PATH_BUFFER_SIZE = 32768;
+            wchar_t pathBuffer[PATH_BUFFER_SIZE];
+            DWORD pathSize = GetEnvironmentVariableW(L"PATH", pathBuffer, PATH_BUFFER_SIZE);
             
-            if (pathSize > 0 && pathSize < 32768) {
-                std::wstring newPath = exeDirW + L";" + std::wstring(pathBuffer);
-                
-                // Also add bin subdirectory if it exists
+            if (pathSize > 0 && pathSize < PATH_BUFFER_SIZE - 1) {
+                // Build new PATH with application directories prepended
                 std::wstring binDir = exeDirW + L"\\bin";
-                if (GetFileAttributesW(binDir.c_str()) != INVALID_FILE_ATTRIBUTES) {
-                    newPath = binDir + L";" + newPath;
+                bool hasBinDir = (GetFileAttributesW(binDir.c_str()) != INVALID_FILE_ATTRIBUTES);
+                
+                // Reserve space for efficiency
+                std::wstring newPath;
+                newPath.reserve(pathSize + exeDirW.length() + (hasBinDir ? binDir.length() + 2 : 1) + 10);
+                
+                if (hasBinDir) {
+                    newPath = binDir + L";" + exeDirW + L";" + std::wstring(pathBuffer);
+                } else {
+                    newPath = exeDirW + L";" + std::wstring(pathBuffer);
                 }
                 
                 SetEnvironmentVariableW(L"PATH", newPath.c_str());
@@ -802,9 +805,11 @@ int main(int argc, char* argv[]) {
                     SetEnvironmentVariableW(L"PATH", exeDirW.c_str());
                 }
             }
-            // If pathSize >= 32768, PATH is too large - continue without modification
+            // If pathSize >= PATH_BUFFER_SIZE - 1, PATH is too large - continue without modification
         }
     }
+    // If GetModuleFileNameW failed or path was truncated, continue anyway
+    // Qt will get the path later
     
     // NOW it's safe to create QApplication
     QApplication app(argc, argv);
