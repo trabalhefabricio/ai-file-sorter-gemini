@@ -2,53 +2,101 @@
 
 ## Executive Summary
 
-**Problem:** Users continue to experience `?dropEvent@QTableview@@MEAAXPEAVQDropEvent@@@Z` DLL errors at startup on Windows despite previous DLL loading fixes.
+**Problem:** Users experience `?dropEvent@QTableview@@MEAAXPEAVQDropEvent@@@Z` DLL errors at startup on Windows due to Qt version mismatches.
 
-**New Strategy (January 2026):** Instead of trying to fix DLL loading order (unreliable), we now **explicitly disable drag-and-drop on all Qt view widgets** to prevent the dropEvent virtual function from being called. This is a surgical, minimal-change solution that addresses the root cause.
+**Current Strategy (January 2026):** Provide **detailed, copyable error messages** with diagnostic information when DLL setup fails, allowing users to:
+1. Understand exactly what went wrong
+2. Copy full diagnostics for troubleshooting
+3. Choose to abort or continue at their own risk
+4. Get actionable steps to fix the issue
 
-**Result:** The dropEvent method is never invoked, so Qt version mismatches no longer cause crashes.
+**Previous Strategy (Reverted):** Attempted to disable drag-and-drop to prevent dropEvent from being called, but this removed functionality that users want to keep.
 
 ## Implementation
 
-### Phase 1: Disable Drag-and-Drop (Current Fix)
+### Enhanced Error Reporting
 
-We explicitly disable drag-and-drop on all QTableView, QTableWidget, QTreeView, QTreeWidget, and QListWidget instances throughout the application:
+When DLL path setup fails, users now see a comprehensive error dialog with:
 
-```cpp
-// Example from CategorizationDialog.cpp
-table_view = new QTableView(this);
-table_view->setModel(model);
-// ... other settings ...
+**Main Message:**
+- Clear explanation that DLL setup failed
+- Warning that application will likely crash
+- Option to view details (copyable)
+- Choice to Abort or Ignore
 
-// CRITICAL FIX: Explicitly disable drag-and-drop to prevent dropEvent DLL errors
-table_view->setDragEnabled(false);
-table_view->setAcceptDrops(false);
-table_view->setDragDropMode(QAbstractItemView::NoDragDrop);
+**Detailed Diagnostics (Copyable):**
+```
+=== DLL Setup Diagnostics ===
+
+Application Directory: C:\Program Files\AI File Sorter
+
+DLL Setup Methods Attempted:
+  - AddDllDirectory: Attempted (failed)
+  - PATH prepending: Attempted (failed)
+
+This failure means the system may load Qt DLLs from:
+  - System PATH (wrong version)
+  - Windows System32 directory (wrong version)
+Instead of from the application directory.
+
+Common causes:
+  1. Another Qt installation in system PATH
+  2. Insufficient permissions
+  3. PATH environment variable too large
+  4. Security software blocking DLL manipulation
+
+Likely errors if you continue:
+  - QTableView::dropEvent not found
+  - QWidget virtual function errors
+  - Qt plugin loading failures
+  - Application crash during UI initialization
+
+System PATH Directories (first 10):
+  1. C:\Program Files\Qt\6.7.0\bin
+  2. C:\Windows\System32
+  ...
+
+Qt installations found in PATH:
+  - C:\Program Files\Qt\6.7.0\bin
+
+Recommended actions:
+  1. Run as Administrator (allows DLL path manipulation)
+  2. Remove other Qt installations from system PATH
+  3. Check for conflicting Qt in C:\Windows\System32
+  4. Disable antivirus temporarily to test
+  5. Reinstall application to a simpler path (no spaces/special chars)
+
+You can copy this entire message for troubleshooting.
 ```
 
-**Files Modified:**
-- `app/lib/CategorizationDialog.cpp` - QTableView (main categorization dialog)
-- `app/lib/DryRunPreviewDialog.cpp` - QTableWidget (preview dialog)
-- `app/lib/UsageStatsDialog.cpp` - 2x QTableWidget (OpenAI & Gemini history tables)
-- `app/lib/MainAppUiBuilder.cpp` - 2x QTreeView (results tree, folder contents)
-- `app/lib/MainApp.cpp` - QTreeView (file explorer)
-- `app/lib/UserProfileDialog.cpp` - 3x QTreeWidget (characteristics, folder insights, templates)
-- `app/lib/WhitelistManagerDialog.cpp` - QListWidget (whitelist list)
+### Code Changes
 
-**NOT Modified:**
-- `app/lib/WhitelistTreeEditor.cpp` - QTreeWidget with intentional drag-drop functionality for reordering whitelist items. This widget has explicit drag-drop enabled and should remain as-is unless users report dropEvent errors in the whitelist editor specifically.
+**File:** `app/startapp_windows.cpp`
 
-### Phase 2: Keep DLL Protection (Fallback)
+**New Functions:**
+```cpp
+QString getPathDiagnostics() {
+    // Returns formatted string with:
+    // - First 10 PATH directories
+    // - Qt installations found in PATH
+    // - Diagnostic information
+}
+```
 
-The existing DLL path manipulation code in `startapp_windows.cpp` remains in place as a defense-in-depth measure. If both protections work together, the application should be robust against Qt version mismatches.
+**Modified DLL Setup Error Handling:**
+- Collects diagnostics before QApplication creation
+- Shows detailed QMessageBox after Qt initialized
+- Makes all text copyable (QTextEdit with TextSelectableByMouse)
+- Provides Abort/Ignore choice
+- Logs user decision
 
-## Why This Strategy Works
-
-1. **Prevents Method Call:** By disabling drag-and-drop, Qt never tries to call dropEvent(), so the missing symbol is never looked up
-2. **No Functionality Loss:** The application doesn't actually use drag-and-drop in these views (except WhitelistTreeEditor, which is handled separately)
-3. **Minimal Change:** Only 3 lines added per widget, easily reviewable and maintainable
-4. **Cross-Version Compatible:** Works regardless of Qt version, DLL loading order, or PATH configuration
-5. **No Side Effects:** setDragEnabled(false) is the official Qt way to disable drag-drop; no hacks or workarounds
+**Why This Works Better:**
+1. **Transparency:** Users see exactly what failed and why
+2. **Actionable:** Clear steps to fix the problem
+3. **Copyable:** Users can share diagnostics with support/developers
+4. **Safe:** Default is Abort (prevents crashes)
+5. **Flexible:** Users can still choose to continue if they understand the risk
+6. **Keeps Functionality:** Drag-and-drop remains enabled where intended
 
 ## Problem Description
 
