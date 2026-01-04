@@ -4,6 +4,7 @@
 #include <QFileInfo>
 #include <QDebug>
 #include <QMessageBox>
+#include <QTextEdit>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QLibrary>
@@ -14,6 +15,7 @@
 #include <QStringList>
 
 #include "DllVersionChecker.hpp"
+#include "ErrorReporter.hpp"
 
 #include <cstdlib>
 #include <string>
@@ -772,6 +774,70 @@ bool launch_main_process(const QString& mainExecutable,
     return true;
 }
 
+/**
+ * @brief Show a detailed, copyable error dialog with diagnostic information
+ * 
+ * This creates a QMessageBox with DetailedText that can be copied to clipboard.
+ * Users can click "Show Details" to see and copy the full diagnostic information.
+ */
+void showDllSetupError(const QString& summary, const QString& details) {
+    QMessageBox msgBox;
+    msgBox.setIcon(QMessageBox::Critical);
+    msgBox.setWindowTitle(QObject::tr("Critical DLL Setup Error"));
+    msgBox.setText(summary);
+    msgBox.setDetailedText(details);
+    msgBox.setStandardButtons(QMessageBox::Abort | QMessageBox::Ignore);
+    msgBox.setDefaultButton(QMessageBox::Abort);
+    
+    // Make the detailed text copyable
+    msgBox.setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
+    
+    msgBox.exec();
+}
+
+/**
+ * @brief Get detailed PATH information for diagnostics
+ */
+QString getPathDiagnostics() {
+    QString diagnostics;
+    
+    #ifdef _WIN32
+    wchar_t pathBuffer[32768];
+    DWORD pathSize = GetEnvironmentVariableW(L"PATH", pathBuffer, 32768);
+    
+    if (pathSize > 0 && pathSize < 32768) {
+        QString pathStr = QString::fromWCharArray(pathBuffer);
+        QStringList paths = pathStr.split(';', Qt::SkipEmptyParts);
+        
+        diagnostics += "System PATH Directories (first 10):\n";
+        for (int i = 0; i < qMin(10, paths.size()); ++i) {
+            diagnostics += QString("  %1. %2\n").arg(i + 1).arg(paths[i]);
+        }
+        
+        if (paths.size() > 10) {
+            diagnostics += QString("  ... and %1 more directories\n").arg(paths.size() - 10);
+        }
+        
+        // Look for Qt installations in PATH
+        diagnostics += "\nQt installations found in PATH:\n";
+        bool foundQt = false;
+        for (const QString& path : paths) {
+            if (path.contains("Qt", Qt::CaseInsensitive) || 
+                QFileInfo::exists(path + "/Qt6Core.dll") ||
+                QFileInfo::exists(path + "/Qt6Widgets.dll")) {
+                diagnostics += QString("  - %1\n").arg(path);
+                foundQt = true;
+            }
+        }
+        if (!foundQt) {
+            diagnostics += "  (None found)\n";
+        }
+    }
+    #endif
+    
+    return diagnostics;
+}
+
 } // namespace
 
 int main(int argc, char* argv[]) {
@@ -872,17 +938,42 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Show critical warning if DLL path setup failed
-    if (!dllPathSetupSuccessful && pathLen > 0) {
-        MessageBoxW(NULL,
-            L"Failed to configure DLL search paths properly.\n\n"
-            L"This may cause \"entry point not found\" errors such as:\n"
-            L"- QTableView::dropEvent not found\n"
-            L"- Other Qt virtual function errors\n\n"
-            L"The application may not start correctly.\n\n"
-            L"Try running as Administrator or check your system PATH for conflicting Qt installations.",
-            L"Critical DLL Setup Error",
-            MB_ICONERROR | MB_OK);
+    // Store DLL setup status and diagnostics BEFORE creating QApplication
+    // We'll show a detailed error dialog after Qt is initialized
+    bool needsDllSetupWarning = (!dllPathSetupSuccessful && pathLen > 0);
+    QString dllSetupDiagnostics;
+    
+    if (needsDllSetupWarning) {
+        // Collect diagnostic information while we still have the raw Windows data
+        std::wstring exePathStr(exePath);
+        size_t lastSlash = exePathStr.find_last_of(L"\\/");
+        std::wstring exeDirW = (lastSlash != std::wstring::npos) ? exePathStr.substr(0, lastSlash) : exePathStr;
+        
+        dllSetupDiagnostics += "=== DLL Setup Diagnostics ===\n\n";
+        dllSetupDiagnostics += QString("Application Directory: %1\n\n")
+            .arg(QString::fromWCharArray(exeDirW.c_str()));
+        
+        dllSetupDiagnostics += "DLL Setup Methods Attempted:\n";
+        dllSetupDiagnostics += QString("  - AddDllDirectory: %1\n")
+            .arg(secureSearchEnabled ? "Attempted (failed)" : "Not available");
+        dllSetupDiagnostics += "  - PATH prepending: Attempted (failed)\n\n";
+        
+        dllSetupDiagnostics += "This failure means the system may load Qt DLLs from:\n";
+        dllSetupDiagnostics += "  - System PATH (wrong version)\n";
+        dllSetupDiagnostics += "  - Windows System32 directory (wrong version)\n";
+        dllSetupDiagnostics += "Instead of from the application directory.\n\n";
+        
+        dllSetupDiagnostics += "Common causes:\n";
+        dllSetupDiagnostics += "  1. Another Qt installation in system PATH\n";
+        dllSetupDiagnostics += "  2. Insufficient permissions\n";
+        dllSetupDiagnostics += "  3. PATH environment variable too large\n";
+        dllSetupDiagnostics += "  4. Security software blocking DLL manipulation\n\n";
+        
+        dllSetupDiagnostics += "Likely errors if you continue:\n";
+        dllSetupDiagnostics += "  - QTableView::dropEvent not found\n";
+        dllSetupDiagnostics += "  - QWidget virtual function errors\n";
+        dllSetupDiagnostics += "  - Qt plugin loading failures\n";
+        dllSetupDiagnostics += "  - Application crash during UI initialization\n\n";
     }
     
     // Set Qt plugin path to application directory to prevent loading plugins from wrong Qt version
@@ -910,6 +1001,56 @@ int main(int argc, char* argv[]) {
 
     const QString exeDir = QCoreApplication::applicationDirPath();
     QDir::setCurrent(exeDir);
+    
+    // Show detailed DLL setup warning if setup failed (now that QMessageBox is available)
+    if (needsDllSetupWarning) {
+        dllSetupDiagnostics += getPathDiagnostics();
+        
+        dllSetupDiagnostics += "\nRecommended actions:\n";
+        dllSetupDiagnostics += "  1. Run as Administrator (allows DLL path manipulation)\n";
+        dllSetupDiagnostics += "  2. Remove other Qt installations from system PATH\n";
+        dllSetupDiagnostics += "  3. Check for conflicting Qt in C:\\Windows\\System32\n";
+        dllSetupDiagnostics += "  4. Disable antivirus temporarily to test\n";
+        dllSetupDiagnostics += "  5. Reinstall application to a simpler path (no spaces/special chars)\n\n";
+        
+        dllSetupDiagnostics += "You can copy this entire message for troubleshooting.\n";
+        dllSetupDiagnostics += "Click 'Show Details >>' button below to see PATH diagnostics.\n\n";
+        dllSetupDiagnostics += "=== For GitHub Copilot Users ===\n";
+        dllSetupDiagnostics += "When errors occur, look for COPILOT_ERROR_*.md files in your logs directory.\n";
+        dllSetupDiagnostics += "Copy the file contents and paste into Copilot Chat for step-by-step help.";
+        
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Critical);
+        msgBox.setWindowTitle(QObject::tr("Critical DLL Setup Error"));
+        msgBox.setText(QObject::tr(
+            "Failed to configure DLL search paths properly.\n\n"
+            "This WILL cause \"entry point not found\" errors when UI widgets are created.\n\n"
+            "The application will likely crash during startup.\n\n"
+            "Click 'Show Details' to see full diagnostic information (copyable).\n\n"
+            "📋 Copilot Users: Error reports are saved to logs/COPILOT_ERROR_*.md\n"
+            "   Copy that file and paste into Copilot Chat for help!"));
+        msgBox.setDetailedText(dllSetupDiagnostics);
+        msgBox.setStandardButtons(QMessageBox::Abort | QMessageBox::Ignore);
+        msgBox.setDefaultButton(QMessageBox::Abort);
+        
+        // Make text copyable
+        msgBox.setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
+        
+        // Find the QTextEdit in the message box and make it copyable
+        QList<QTextEdit*> textEdits = msgBox.findChildren<QTextEdit*>();
+        for (QTextEdit* edit : textEdits) {
+            edit->setReadOnly(true);
+            edit->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
+        }
+        
+        int result = msgBox.exec();
+        if (result == QMessageBox::Abort) {
+            qCritical() << "User aborted due to DLL setup failure";
+            return EXIT_FAILURE;
+        }
+        // User clicked Ignore, continue at their own risk
+        qWarning() << "User chose to ignore DLL setup failure - application may crash";
+    }
     
     // Log DLL search setup status
     if (!secureSearchEnabled) {

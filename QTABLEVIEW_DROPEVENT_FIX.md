@@ -1,5 +1,103 @@
 # Fix for QTableView::dropEvent DLL Error
 
+## Executive Summary
+
+**Problem:** Users experience `?dropEvent@QTableview@@MEAAXPEAVQDropEvent@@@Z` DLL errors at startup on Windows due to Qt version mismatches.
+
+**Current Strategy (January 2026):** Provide **detailed, copyable error messages** with diagnostic information when DLL setup fails, allowing users to:
+1. Understand exactly what went wrong
+2. Copy full diagnostics for troubleshooting
+3. Choose to abort or continue at their own risk
+4. Get actionable steps to fix the issue
+
+**Previous Strategy (Reverted):** Attempted to disable drag-and-drop to prevent dropEvent from being called, but this removed functionality that users want to keep.
+
+## Implementation
+
+### Enhanced Error Reporting
+
+When DLL path setup fails, users now see a comprehensive error dialog with:
+
+**Main Message:**
+- Clear explanation that DLL setup failed
+- Warning that application will likely crash
+- Option to view details (copyable)
+- Choice to Abort or Ignore
+
+**Detailed Diagnostics (Copyable):**
+```
+=== DLL Setup Diagnostics ===
+
+Application Directory: C:\Program Files\AI File Sorter
+
+DLL Setup Methods Attempted:
+  - AddDllDirectory: Attempted (failed)
+  - PATH prepending: Attempted (failed)
+
+This failure means the system may load Qt DLLs from:
+  - System PATH (wrong version)
+  - Windows System32 directory (wrong version)
+Instead of from the application directory.
+
+Common causes:
+  1. Another Qt installation in system PATH
+  2. Insufficient permissions
+  3. PATH environment variable too large
+  4. Security software blocking DLL manipulation
+
+Likely errors if you continue:
+  - QTableView::dropEvent not found
+  - QWidget virtual function errors
+  - Qt plugin loading failures
+  - Application crash during UI initialization
+
+System PATH Directories (first 10):
+  1. C:\Program Files\Qt\6.7.0\bin
+  2. C:\Windows\System32
+  ...
+
+Qt installations found in PATH:
+  - C:\Program Files\Qt\6.7.0\bin
+
+Recommended actions:
+  1. Run as Administrator (allows DLL path manipulation)
+  2. Remove other Qt installations from system PATH
+  3. Check for conflicting Qt in C:\Windows\System32
+  4. Disable antivirus temporarily to test
+  5. Reinstall application to a simpler path (no spaces/special chars)
+
+You can copy this entire message for troubleshooting.
+```
+
+### Code Changes
+
+**File:** `app/startapp_windows.cpp`
+
+**New Functions:**
+```cpp
+QString getPathDiagnostics() {
+    // Returns formatted string with:
+    // - First 10 PATH directories
+    // - Qt installations found in PATH
+    // - Diagnostic information
+}
+```
+
+**Modified DLL Setup Error Handling:**
+- Collects diagnostics before QApplication creation
+- Shows detailed QMessageBox after Qt initialized
+- Makes all text copyable (QTextEdit with TextSelectableByMouse)
+- Provides Abort/Ignore choice
+- Logs user decision
+
+**Why This Works Better:**
+1. **Transparency:** Users see exactly what failed and why
+2. **Actionable:** Clear steps to fix the problem
+3. **Copyable:** Users can share diagnostics with support/developers
+4. **Safe:** Default is Abort (prevents crashes)
+5. **Flexible:** Users can still choose to continue if they understand the risk
+6. **Keeps Functionality:** Drag-and-drop remains enabled where intended
+
 ## Problem Description
 
 The error `?dropEvent@QTableview@@MEAAXPEAVQDropEvent@@@Z` (mangled name for QTableView::dropEvent) appears during startup on Windows. This is a Qt virtual function symbol that cannot be found, indicating a version mismatch between the Qt DLLs used at compile time and runtime.
