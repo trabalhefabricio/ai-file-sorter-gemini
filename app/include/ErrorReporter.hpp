@@ -56,6 +56,11 @@ public:
         int source_line;             // __LINE__
         std::string function_name;   // __FUNCTION__
         
+        // NEW: Code context for non-developers
+        std::string stack_trace;     // Stack trace if available
+        std::string code_snippet;    // Code around error location
+        std::string copilot_prompt;  // Formatted message for GitHub Copilot
+        
         // System context
         std::string os_version;      // Windows 10, Ubuntu 22.04, etc.
         std::string qt_compile_version;
@@ -134,6 +139,29 @@ public:
      * @brief Get the error database file path
      */
     static std::string get_error_db_path();
+    
+    /**
+     * @brief Generate a Copilot-friendly error message for the last error
+     * 
+     * Creates a formatted markdown message that can be copied and pasted
+     * directly into GitHub Copilot chat for assistance.
+     * 
+     * @return Markdown-formatted string ready for Copilot
+     */
+    static std::string generate_copilot_message(const ErrorContext& context, const std::string& error_id);
+    
+    /**
+     * @brief Get code snippet around the error location
+     * 
+     * Reads the source file and extracts lines around the error location
+     * for context. Returns empty string if file cannot be read.
+     * 
+     * @param file_path Path to source file
+     * @param line_number Line number where error occurred
+     * @param context_lines Number of lines before/after to include (default: 5)
+     * @return Code snippet with line numbers
+     */
+    static std::string get_code_snippet(const std::string& file_path, int line_number, int context_lines = 5);
 
 private:
     static std::string app_version_;
@@ -149,6 +177,7 @@ private:
     static std::string severity_to_string(Severity severity);
     static void log_to_structured_db(const ErrorContext& context, const std::string& error_id);
     static void log_to_human_readable(const ErrorContext& context, const std::string& error_id);
+    static std::string generate_troubleshooting_steps(const ErrorContext& context);
 
     ErrorReporter() = delete;
 };

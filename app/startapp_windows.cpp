@@ -1014,7 +1014,10 @@ int main(int argc, char* argv[]) {
         dllSetupDiagnostics += "  5. Reinstall application to a simpler path (no spaces/special chars)\n\n";
         
         dllSetupDiagnostics += "You can copy this entire message for troubleshooting.\n";
-        dllSetupDiagnostics += "Click 'Show Details >>' button below to see PATH diagnostics.";
+        dllSetupDiagnostics += "Click 'Show Details >>' button below to see PATH diagnostics.\n\n";
+        dllSetupDiagnostics += "=== For GitHub Copilot Users ===\n";
+        dllSetupDiagnostics += "When errors occur, look for COPILOT_ERROR_*.md files in your logs directory.\n";
+        dllSetupDiagnostics += "Copy the file contents and paste into Copilot Chat for step-by-step help.";
         
         QMessageBox msgBox;
         msgBox.setIcon(QMessageBox::Critical);
@@ -1023,7 +1026,9 @@ int main(int argc, char* argv[]) {
             "Failed to configure DLL search paths properly.\n\n"
             "This WILL cause \"entry point not found\" errors when UI widgets are created.\n\n"
             "The application will likely crash during startup.\n\n"
-            "Click 'Show Details' to see full diagnostic information (copyable)."));
+            "Click 'Show Details' to see full diagnostic information (copyable).\n\n"
+            "📋 Copilot Users: Error reports are saved to logs/COPILOT_ERROR_*.md\n"
+            "   Copy that file and paste into Copilot Chat for help!"));
         msgBox.setDetailedText(dllSetupDiagnostics);
         msgBox.setStandardButtons(QMessageBox::Abort | QMessageBox::Ignore);
         msgBox.setDefaultButton(QMessageBox::Abort);

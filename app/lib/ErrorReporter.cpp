@@ -14,6 +14,7 @@
 #include <random>
 #include <iomanip>
 #include <sstream>
+#include <fstream>
 #include <filesystem>
 
 #ifdef _WIN32
@@ -104,7 +105,31 @@ std::string ErrorReporter::report_quick(Category category,
         context.command_line_args = QCoreApplication::arguments().join(" ").toStdString();
     }
     
-    return report_error(context);
+    // NEW: Generate code snippet for context
+    if (!context.source_file.empty() && context.source_line > 0) {
+        context.code_snippet = get_code_snippet(context.source_file, context.source_line, 5);
+    }
+    
+    std::string error_id = report_error(context);
+    
+    // NEW: Generate and log Copilot-friendly message
+    std::string copilot_msg = generate_copilot_message(context, error_id);
+    context.copilot_prompt = copilot_msg;
+    
+    // Save Copilot message to a separate file for easy access
+    std::string copilot_file = log_directory_ + "/COPILOT_ERROR_" + error_id + ".md";
+    std::ofstream copilot_out(copilot_file);
+    if (copilot_out.is_open()) {
+        copilot_out << copilot_msg;
+        copilot_out.close();
+        
+        if (error_logger_) {
+            error_logger_->info("Copilot-friendly error message saved to: {}", copilot_file);
+            error_logger_->info("Copy this file's contents and paste into GitHub Copilot Chat for assistance");
+        }
+    }
+    
+    return error_id;
 }
 
 void ErrorReporter::add_context(const std::string& key, const std::string& value) {
@@ -418,4 +443,158 @@ bool ErrorReporter::export_to_json(const std::string& output_path) {
 
 std::string ErrorReporter::get_error_db_path() {
     return log_directory_ + "/errors.jsonl";
+}
+
+std::string ErrorReporter::get_code_snippet(const std::string& file_path, int line_number, int context_lines) {
+    std::ifstream file(file_path);
+    if (!file.is_open()) {
+        return ""; // File cannot be read
+    }
+    
+    std::ostringstream snippet;
+    std::string line;
+    int current_line = 1;
+    int start_line = std::max(1, line_number - context_lines);
+    int end_line = line_number + context_lines;
+    
+    while (std::getline(file, line) && current_line <= end_line) {
+        if (current_line >= start_line) {
+            // Highlight the error line
+            if (current_line == line_number) {
+                snippet << " >>> " << current_line << " | " << line << "\n";
+            } else {
+                snippet << "     " << current_line << " | " << line << "\n";
+            }
+        }
+        current_line++;
+    }
+    
+    file.close();
+    return snippet.str();
+}
+
+std::string ErrorReporter::generate_troubleshooting_steps(const ErrorContext& context) {
+    std::ostringstream steps;
+    
+    steps << "## Troubleshooting Steps\n\n";
+    
+    // Category-specific steps
+    switch (context.category) {
+        case Category::DLL_LOADING:
+            steps << "1. **Check Qt Installation**\n";
+            steps << "   - Verify you have Qt 6.5.3 or compatible version installed\n";
+            steps << "   - Remove other Qt versions from system PATH\n\n";
+            steps << "2. **Run as Administrator**\n";
+            steps << "   - Right-click StartAiFileSorter.exe → Run as administrator\n";
+            steps << "   - This allows DLL path manipulation to work properly\n\n";
+            steps << "3. **Check System PATH**\n";
+            steps << "   - Open System Properties → Environment Variables\n";
+            steps << "   - Look for conflicting Qt installations in PATH\n";
+            steps << "   - Remove or reorder so application directory comes first\n\n";
+            break;
+            
+        case Category::QT_INITIALIZATION:
+            steps << "1. **Verify Qt DLLs**\n";
+            steps << "   - Check that Qt6Core.dll, Qt6Widgets.dll are in app directory\n";
+            steps << "   - Reinstall application if DLLs are missing\n\n";
+            steps << "2. **Check Plugins**\n";
+            steps << "   - Verify plugins/ folder exists in application directory\n";
+            steps << "   - Contains qwindows.dll platform plugin\n\n";
+            break;
+            
+        case Category::STARTUP:
+            steps << "1. **Check Logs**\n";
+            steps << "   - Open logs directory: " << log_directory_ << "\n";
+            steps << "   - Review core.log, errors.log for details\n\n";
+            steps << "2. **Fresh Start**\n";
+            steps << "   - Delete config.ini and restart application\n";
+            steps << "   - Reinstall if problem persists\n\n";
+            break;
+            
+        default:
+            steps << "1. **Review Error Details Above**\n";
+            steps << "   - Copy the error message and context\n";
+            steps << "   - Share with GitHub Copilot for specific guidance\n\n";
+            break;
+    }
+    
+    steps << "## What to Do Next\n\n";
+    steps << "1. **Try the steps above** in order\n";
+    steps << "2. **If issue persists**, copy this entire error message\n";
+    steps << "3. **Paste into GitHub Copilot Chat** and ask:\n";
+    steps << "   \"How do I fix this error? I followed the troubleshooting steps but still have the issue.\"\n\n";
+    
+    return steps.str();
+}
+
+std::string ErrorReporter::generate_copilot_message(const ErrorContext& context, const std::string& error_id) {
+    std::ostringstream msg;
+    
+    msg << "# Error Report for GitHub Copilot\n\n";
+    msg << "*Copy this entire message and paste into GitHub Copilot Chat for assistance*\n\n";
+    msg << "---\n\n";
+    
+    msg << "## Error Summary\n\n";
+    msg << "**Error ID:** `" << error_id << "`\n";
+    msg << "**Category:** " << category_to_string(context.category) << "\n";
+    msg << "**Severity:** " << severity_to_string(context.severity) << "\n";
+    msg << "**Error Code:** `" << context.error_code << "`\n";
+    msg << "**Message:** " << context.message << "\n\n";
+    
+    msg << "## Where the Error Occurred\n\n";
+    msg << "**File:** `" << context.source_file << "`\n";
+    msg << "**Line:** " << context.source_line << "\n";
+    msg << "**Function:** `" << context.function_name << "()`\n\n";
+    
+    // Add code snippet if available
+    if (!context.code_snippet.empty()) {
+        msg << "**Code Context:**\n```cpp\n";
+        msg << context.code_snippet;
+        msg << "```\n\n";
+    }
+    
+    msg << "## System Information\n\n";
+    msg << "- **OS:** " << context.os_version << "\n";
+    msg << "- **App Version:** " << context.app_version << "\n";
+    msg << "- **Qt Compile Version:** " << context.qt_compile_version << "\n";
+    msg << "- **Qt Runtime Version:** " << context.qt_runtime_version << "\n";
+    msg << "- **Working Directory:** `" << context.working_directory << "`\n\n";
+    
+    // DLL-specific info
+    if (!context.dll_name.empty()) {
+        msg << "## DLL Information\n\n";
+        msg << "- **DLL Name:** `" << context.dll_name << "`\n";
+        if (!context.dll_path.empty()) {
+            msg << "- **DLL Path:** `" << context.dll_path << "`\n";
+        }
+        if (!context.missing_symbol.empty()) {
+            msg << "- **Missing Symbol:** `" << context.missing_symbol << "`\n";
+        }
+        msg << "\n";
+    }
+    
+    // PATH information
+    if (!context.system_path_dirs.empty()) {
+        msg << "## System PATH\n\n";
+        msg << "```\n" << context.system_path_dirs << "\n```\n\n";
+    }
+    
+    // Extra context
+    if (!context.extra_data.empty()) {
+        msg << "## Additional Context\n\n";
+        for (const auto& [key, value] : context.extra_data) {
+            msg << "- **" << key << ":** " << value << "\n";
+        }
+        msg << "\n";
+    }
+    
+    // Add troubleshooting steps
+    msg << generate_troubleshooting_steps(context);
+    
+    msg << "---\n\n";
+    msg << "## Question for Copilot\n\n";
+    msg << "Based on this error, what is the root cause and how can I fix it?\n";
+    msg << "I'm using AI File Sorter on Windows and I'm comfortable following step-by-step instructions.\n";
+    
+    return msg.str();
 }
