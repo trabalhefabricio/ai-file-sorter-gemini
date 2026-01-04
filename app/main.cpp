@@ -1,5 +1,6 @@
 #include "EmbeddedEnv.hpp"
 #include "Logger.hpp"
+#include "ErrorReporter.hpp"
 #include "MainApp.hpp"
 #include "Utils.hpp"
 #include "LLMSelectionDialog.hpp"
@@ -41,6 +42,11 @@ bool initialize_loggers()
 {
     try {
         Logger::setup_loggers();
+        
+        // Initialize ErrorReporter with structured error tracking
+        std::string log_dir = Logger::get_log_directory();
+        ErrorReporter::initialize(APP_VERSION, log_dir);
+        
         return true;
     } catch (const std::exception &e) {
         // Try to log the error if possible
@@ -54,6 +60,14 @@ bool initialize_loggers()
             std::fprintf(stderr, "  - Write permissions in application directory\n");
             std::fprintf(stderr, "  - Logs directory exists and is writable\n");
         }
+        
+        // Try to report error even if logger init failed
+        try {
+            REPORT_STARTUP_ERROR("LOGGER_INIT_FAILED", e.what());
+        } catch (...) {
+            // Ignore if error reporter also fails
+        }
+        
         return false;
     }
 }

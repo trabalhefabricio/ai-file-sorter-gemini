@@ -14,6 +14,7 @@
 #include <QStringList>
 
 #include "DllVersionChecker.hpp"
+#include "ErrorReporter.hpp"
 
 #include <cstdlib>
 #include <string>
