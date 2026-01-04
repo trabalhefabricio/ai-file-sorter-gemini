@@ -502,7 +502,8 @@ QIcon MainAppUiBuilder::icon_for(MainApp& app, const char* name, QStyle::Standar
             QPixmap pixmap = icon.pixmap(targetSize, targetSize);
             if (!pixmap.isNull()) {
                 const int padding = std::max(4, targetSize / 4);
-                const QSize paddedSize(pixmap.width() + padding * 2, pixmap.height() + padding * 2);
+                const QSize paddedSize(static_cast<int>(pixmap.width() + padding * 2),
+                                      static_cast<int>(pixmap.height() + padding * 2));
                 QPixmap padded(paddedSize);
                 padded.fill(Qt::transparent);
                 QPainter painter(&padded);
