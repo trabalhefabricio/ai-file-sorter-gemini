@@ -74,9 +74,7 @@ void WhitelistTreeEditor::setup_ui()
     tree_widget_->setSelectionMode(QAbstractItemView::SingleSelection);
     tree_widget_->setAlternatingRowColors(true);
     
-    // CRITICAL: Explicitly disable drag-drop to prevent dropEvent crashes
-    // When Qt DLL version mismatch occurs, dropEvent virtual function may not be found
-    // Disabling drag-drop prevents this function from being called
+    // Explicitly disable drag-drop to prevent dropEvent crashes on Qt version mismatch
     tree_widget_->setDragEnabled(false);
     tree_widget_->setAcceptDrops(false);
     tree_widget_->setDragDropMode(QAbstractItemView::NoDragDrop);
