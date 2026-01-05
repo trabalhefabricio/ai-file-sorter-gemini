@@ -46,7 +46,7 @@ else ifeq ($(UNAME), Darwin)
     export LDFLAGS += -L$(LIBFFI_PREFIX)/lib
     export CPPFLAGS += -I$(LIBFFI_PREFIX)/include
     PLATFORM := MacOS
-    CXXFLAGS += -DMACOS -DENABLE_METAL -DGGML_USE_METAL -Wno-deprecated -Iinclude/llama -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)
+    CXXFLAGS += -DMACOS -DENABLE_METAL -DGGML_USE_METAL -Wno-deprecated -Iinclude/external/llama.cpp/include -Iinclude/external/llama.cpp/ggml/include -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)
     ifneq ($(strip $(SDKROOT)),)
     export SDKROOT
     CXXFLAGS += -isysroot $(SDKROOT) -stdlib=libc++ -I$(SDKROOT)/usr/include/c++/v1
@@ -97,7 +97,10 @@ CXXFLAGS += -Wno-array-bounds
 else
 CXXFLAGS += -Wno-array-bounds -Wno-stringop-overflow -Wno-stringop-overread
 endif
-INCLUDE_DIRS = -I./include -I./include/llama
+INCLUDE_DIRS = -I./include -I./include/external/llama.cpp/include -I./include/external/llama.cpp/ggml/include
+ifeq ($(UNAME), Linux)
+INCLUDE_DIRS += $(shell pkg-config --cflags jsoncpp 2>/dev/null)
+endif
 LIB_DIRS =
 ifeq ($(UNAME), Linux)
 LIB_DIRS += -L./lib/precompiled/cpu/bin -L./lib/precompiled
