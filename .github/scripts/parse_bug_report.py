@@ -106,8 +106,11 @@ class BugReportParser:
 
     def calculate_priority(self, category: str, severity: str) -> str:
         """Calculate priority using priority matrix"""
+        # Extract just the severity level (e.g., "Critical" from "Critical - Application unusable")
+        severity_level = severity.split(' - ')[0] if severity else ''
+        
         if category in self.PRIORITY_MATRIX:
-            return self.PRIORITY_MATRIX[category].get(severity, 'P3')
+            return self.PRIORITY_MATRIX[category].get(severity_level, 'P3')
         return 'P3'
 
     def detect_pattern(self, text: str) -> Tuple[Optional[str], float]:
