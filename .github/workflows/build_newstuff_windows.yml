@@ -501,6 +501,8 @@ jobs:
 
           # Verify lib directory structure
           Write-Host "`n=== Verifying lib directory structure ==="
+          
+          # Check for base directories that must exist
           $criticalDirs = @(
             "output\lib\ggml",
             "output\lib\precompiled\cpu"
@@ -518,10 +520,21 @@ jobs:
             }
           }
           
+          # Check for optional variant directories (cuda, vulkan) and report if present
+          $optionalDirs = @("output\lib\ggml\wcuda", "output\lib\ggml\wvulkan", "output\lib\precompiled\cuda", "output\lib\precompiled\vulkan")
+          foreach ($dir in $optionalDirs) {
+            $fullPath = Join-Path $env:GITHUB_WORKSPACE $dir
+            if (Test-Path $fullPath) {
+              $fileCount = (Get-ChildItem $fullPath -Recurse -File -ErrorAction SilentlyContinue).Count
+              Write-Host "[OK] Found optional: $dir ($fileCount files)"
+            }
+          }
+          
           if ($missingDirs.Count -gt 0) {
-            Write-Error ("Bundle verification failed: Missing $($missingDirs.Count) critical directories. " + `
-                        "The application requires lib/ggml and lib/precompiled directories to run independently. " + `
-                        "Check the 'Bundle Files' step logs.")
+            $errorMsg = "Bundle verification failed: Missing $($missingDirs.Count) critical directories. " +
+                        "The application requires lib/ggml and lib/precompiled directories to run independently. " +
+                        "Check the 'Bundle Files' step logs."
+            Write-Error $errorMsg
             exit 1
           }
 
