@@ -1,9 +1,11 @@
 name: Build Windows on newstuff
 
-# This workflow is designed to be manually triggered only (via workflow_dispatch)
-# It's specifically for agent-initiated builds where iterative fixing is needed
-# and not meant to run automatically on push events
+# This workflow can be triggered both manually (via workflow_dispatch) and automatically
+# - Manual trigger: for agent-initiated builds where iterative fixing is needed
+# - Auto trigger: builds automatically on every commit to newstuff branch
 on:
+  push:
+    branches: ["newstuff"]
   workflow_dispatch:
 
 jobs:
