@@ -13,6 +13,7 @@ Usage:
 
 import argparse
 import json
+import logging
 import re
 import sys
 from pathlib import Path
@@ -58,7 +59,7 @@ class BugReportParser:
 
     # Priority matrix from ISSUE_TRIAGE_GUIDE.md
     PRIORITY_MATRIX = {
-        'Application Crash/Won\'t Start': {'Critical': 'P0', 'High': 'P0', 'Medium': 'P1', 'Low': 'P2'},
+        "Application Crash/Won't Start": {'Critical': 'P0', 'High': 'P0', 'Medium': 'P1', 'Low': 'P2'},
         'DLL/Library Loading Error': {'Critical': 'P0', 'High': 'P1', 'Medium': 'P1', 'Low': 'P2'},
         'Qt/UI Issue': {'Critical': 'P1', 'High': 'P1', 'Medium': 'P2', 'Low': 'P3'},
         'Categorization/AI Model Issue': {'Critical': 'P1', 'High': 'P2', 'Medium': 'P2', 'Low': 'P3'},
