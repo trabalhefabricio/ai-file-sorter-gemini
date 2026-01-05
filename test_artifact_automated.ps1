@@ -175,7 +175,8 @@ function Test-ApplicationStartup {
         $script:testsPassed++
         
         # Wait for timeout or manual close
-        $process.WaitForExit($TimeoutSeconds * 1000)
+        $timeoutMs = $TimeoutSeconds * 1000  # Convert seconds to milliseconds
+        $process.WaitForExit($timeoutMs)
         
         if (-not $process.HasExited) {
             Write-TestLog "[→] Closing application after timeout..." -Level INFO
@@ -273,18 +274,19 @@ if (Test-Path $ggmlDll) {
     $script:testsFailed++
 }
 
-# Check Qt version
+# Check Qt version (expected: 6.5.3 based on workflow configuration)
+$expectedQtVersion = "6.5.3"  # Update this when Qt version changes in workflow
 $qtCoreDll = Join-Path $ArtifactPath "Qt6Core.dll"
 if (Test-Path $qtCoreDll) {
     try {
         $qtVersion = (Get-Item $qtCoreDll).VersionInfo.ProductVersion
         Write-TestLog "[✓] Qt6Core.dll version: $qtVersion" -Level PASS
         
-        if ($qtVersion -like "6.5.3*") {
-            Write-TestLog "[✓] Qt version matches expected build version (6.5.3)" -Level PASS
+        if ($qtVersion -like "$expectedQtVersion*") {
+            Write-TestLog "[✓] Qt version matches expected build version ($expectedQtVersion)" -Level PASS
             $script:testsPassed++
         } else {
-            Write-TestLog "[!] Qt version differs from build expectation (6.5.3 vs $qtVersion)" -Level WARN
+            Write-TestLog "[!] Qt version differs from build expectation ($expectedQtVersion vs $qtVersion)" -Level WARN
         }
     } catch {
         Write-TestLog "[✗] Failed to read Qt version: $_" -Level FAIL
@@ -305,13 +307,26 @@ Write-TestLog "`n=== TEST SUITE 3: Environment Check ===" -Level INFO
 Test-QtConflicts | Out-Null
 
 # Check for Visual C++ Redistributable (optional but recommended)
-$vcRedist = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" -ErrorAction SilentlyContinue
+# Check multiple versions: 2015-2022 (versions 14.x use same runtime)
+$vcRedistPaths = @(
+    "HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64",  # 2015
+    "HKLM:\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"  # 2015 (32-bit registry)
+)
+
+$vcRedist = $null
+foreach ($path in $vcRedistPaths) {
+    $vcRedist = Get-ItemProperty $path -ErrorAction SilentlyContinue
+    if ($vcRedist) {
+        break
+    }
+}
+
 if ($vcRedist) {
     $vcVersion = $vcRedist.Version
     Write-TestLog "[✓] Visual C++ Redistributable installed (version $vcVersion)" -Level PASS
     $script:testsPassed++
 } else {
-    Write-TestLog "[!] Visual C++ Redistributable not detected (may cause issues)" -Level WARN
+    Write-TestLog "[!] Visual C++ Redistributable 2015-2022 not detected (may cause issues)" -Level WARN
 }
 
 # ============================================================================

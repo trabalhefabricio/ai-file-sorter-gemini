@@ -75,8 +75,9 @@ Based on repository documentation review:
 1. **Download the artifact:**
    ```powershell
    # Navigate to GitHub Actions page for the repository
-   # Go to workflow run #12: https://github.com/trabalhefabricio/ai-file-sorter-iconic/actions/runs/20682964808
+   # Go to workflow run #12 (ID: 20682964808) in the Actions tab
    # Download artifact: AI-File-Sorter-newstuff-15fb4c77e7cf1de42bd229c25a8d58ab21d90bc1
+   # Note: Requires being logged in to GitHub and having access to the repository
    ```
 
 2. **Extract to test directory:**
