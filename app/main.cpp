@@ -168,9 +168,11 @@ void attach_console_if_requested(bool enable)
         if (freopen_s(&f, "CONIN$", "r", stdin) != 0 || f == nullptr) {
             std::fprintf(stderr, "Warning: Failed to redirect stdin from console\n");
         }
-    } else {
-        std::fprintf(stderr, "Warning: Failed to attach to parent console\n");
     }
+    // Note: If AttachConsole fails, we silently continue as the console attachment
+    // is optional. The user may not have launched from a console, or may be running
+    // as a GUI application. Errors are only reported if attachment succeeds but
+    // redirection fails, which would indicate a more serious problem.
 }
 #endif
 

@@ -922,7 +922,7 @@ int main(int argc, char* argv[]) {
             } else if (pathSize == 0) {
                 // PATH not set or empty, just set to our directory
                 std::wstring binDir = exeDirW + L"\\bin";
-                BOOL success = FALSE;
+                BOOL success;
                 if (GetFileAttributesW(binDir.c_str()) != INVALID_FILE_ATTRIBUTES) {
                     success = SetEnvironmentVariableW(L"PATH", (binDir + L";" + exeDirW).c_str());
                 } else {
