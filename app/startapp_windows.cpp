@@ -845,6 +845,15 @@ QString getPathDiagnostics() {
 
 /**
  * @brief Simple startup logging that works before Qt is initialized
+ * 
+ * Writes timestamped messages to startup_log.txt in the application directory.
+ * This log can be checked if Qt initialization fails, providing crucial debugging
+ * information when the normal logging system isn't available yet.
+ * 
+ * @param msg Message to log
+ * 
+ * Fallback: If file logging fails, the error is silently ignored since we can't
+ * use Qt logging yet. This is by design - startup should continue even if logging fails.
  */
 void log_startup_message(const std::string& msg) {
     // Log to a simple text file that can be checked if startup fails
@@ -868,6 +877,8 @@ void log_startup_message(const std::string& msg) {
             std::strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", std::localtime(&time_t));
             ofs << "[" << time_buf << "] " << msg << std::endl;
         }
+        // Note: If logging fails, we silently continue - this is intentional
+        // since we can't use Qt logging yet and startup must proceed
     }
 }
 
@@ -1271,8 +1282,9 @@ int main(int argc, char* argv[]) {
                         "- Reinstall the application\n"
                         "- Check that lib/ggml directories exist\n"
                         "- Run the diagnose_startup.exe tool for details"));
-                // Continue anyway - set ggmlPath to exe directory as fallback
-                ggmlPath = exeDir;
+                // Don't set ggmlPath here - leave it empty to signal no GGML available
+                // The rest of the code should handle empty ggmlPath gracefully
+                ggmlPath = QString();  // Explicitly set to empty to indicate no GGML
             }
         } else {
             log_startup_message("OK: Found GGML directory at " + ggmlPath.toStdString());

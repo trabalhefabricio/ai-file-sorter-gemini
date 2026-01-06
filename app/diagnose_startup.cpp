@@ -5,8 +5,13 @@
  * This tool can be run independently to diagnose why the application won't start.
  * It checks for common issues like missing DLLs, Qt version conflicts, and path problems.
  * 
- * Compile: cl diagnose_startup.cpp /EHsc
- * Run: diagnose_startup.exe
+ * Build on Windows:
+ *   cl diagnose_startup.cpp /EHsc /std:c++17 /Fe:diagnose_startup.exe
+ * 
+ * Build on Linux:
+ *   g++ -std=c++17 diagnose_startup.cpp -o diagnose_startup -lstdc++fs
+ * 
+ * Run: diagnose_startup.exe (or ./diagnose_startup on Linux)
  */
 
 #include <iostream>
