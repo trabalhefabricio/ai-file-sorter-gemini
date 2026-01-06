@@ -153,10 +153,23 @@ void attach_console_if_requested(bool enable)
         return;
     }
     if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+        // Redirect stdout, stderr, and stdin to the parent console.
+        // Check return values to ensure redirection succeeds and avoid silent failures.
         FILE* f = nullptr;
-        freopen_s(&f, "CONOUT$", "w", stdout);
-        freopen_s(&f, "CONOUT$", "w", stderr);
-        freopen_s(&f, "CONIN$", "r", stdin);
+        if (freopen_s(&f, "CONOUT$", "w", stdout) != 0 || f == nullptr) {
+            // Can't use logger here as it may not be initialized yet
+            std::fprintf(stderr, "Warning: Failed to redirect stdout to console\n");
+        }
+        f = nullptr;
+        if (freopen_s(&f, "CONOUT$", "w", stderr) != 0 || f == nullptr) {
+            std::fprintf(stderr, "Warning: Failed to redirect stderr to console\n");
+        }
+        f = nullptr;
+        if (freopen_s(&f, "CONIN$", "r", stdin) != 0 || f == nullptr) {
+            std::fprintf(stderr, "Warning: Failed to redirect stdin from console\n");
+        }
+    } else {
+        std::fprintf(stderr, "Warning: Failed to attach to parent console\n");
     }
 }
 #endif
