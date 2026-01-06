@@ -467,6 +467,34 @@ The command removes the executable and the staged precompiled libraries. You can
 
 ## Troubleshooting
 
+### Quick Diagnostic Tools
+
+**If the application won't start at all:**
+
+1. **Run the emergency diagnostic script** (Windows):
+   ```cmd
+   emergency_diagnostic.bat
+   ```
+   This creates a detailed report (`emergency_diagnostic_*.txt`) showing:
+   - Missing executables or DLLs
+   - Qt version conflicts
+   - Path issues
+   - Permission problems
+   - Existing error logs
+
+2. **Run the standalone diagnostic tool** (if available):
+   ```cmd
+   diagnose_startup.exe
+   ```
+   This provides a comprehensive analysis and creates `startup_diagnostic.txt`.
+
+3. **Check startup logs**:
+   - `startup_log.txt` - Shows initialization steps before Qt loads
+   - `logs/errors.log` - Detailed error information
+   - `logs/COPILOT_ERROR_*.md` - User-friendly error reports for Copilot users
+
+4. **See the detailed troubleshooting guide**: [TROUBLESHOOTING_STARTUP.md](TROUBLESHOOTING_STARTUP.md)
+
 ### Windows DLL Entry Point Errors
 
 If you encounter errors like:
