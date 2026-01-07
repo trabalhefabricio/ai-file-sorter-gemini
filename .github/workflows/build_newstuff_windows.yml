@@ -49,6 +49,18 @@ jobs:
         run: |
           Write-Host "Checking for Windows SDK installation..."
           
+          # Helper function to search for wininet.lib
+          function Find-WininetLib {
+              param([string]$SearchPath)
+              
+              if (-not (Test-Path $SearchPath)) {
+                  return $null
+              }
+              
+              $wininetLib = Get-ChildItem -Path $SearchPath -Filter "wininet.lib" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+              return $wininetLib
+          }
+          
           # Check for Windows SDK via registry or environment variables
           $sdkDir = $env:WindowsSdkDir
           $sdkVersion = $env:WindowsSDKLibVersion
@@ -65,7 +77,7 @@ jobs:
             } else {
               Write-Warning "wininet.lib not found at expected path: $wininetPath"
               Write-Host "Searching for wininet.lib in SDK directory..."
-              $found = Get-ChildItem -Path $sdkDir -Filter "wininet.lib" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+              $found = Find-WininetLib -SearchPath $sdkDir
               if ($found) {
                 Write-Host "[OK] Found wininet.lib at: $($found.FullName)"
               } else {
@@ -95,8 +107,8 @@ jobs:
                     Write-Host "[OK] Windows SDK directory found at: $path"
                     $sdkFound = $true
                     
-                    # Find wininet.lib
-                    $wininetLib = Get-ChildItem -Path $path -Filter "wininet.lib" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+                    # Find wininet.lib using helper function
+                    $wininetLib = Find-WininetLib -SearchPath $path
                     if ($wininetLib) {
                       Write-Host "[OK] wininet.lib found at: $($wininetLib.FullName)"
                     }

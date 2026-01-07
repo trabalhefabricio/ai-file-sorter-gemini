@@ -331,11 +331,13 @@ Write-Host ""
 if ($LASTEXITCODE -ne 0) {
     throw "CMake configuration failed with exit code $LASTEXITCODE"
 }
+Write-Host "[OK] CMake configuration completed successfully"
 
 & $cmakeExe --build build --config Release -- /m
 if ($LASTEXITCODE -ne 0) {
     throw "CMake build failed with exit code $LASTEXITCODE"
 }
+Write-Host "[OK] CMake build completed successfully"
 
 Pop-Location
 

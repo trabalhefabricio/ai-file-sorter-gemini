@@ -239,7 +239,12 @@ if(WIN32)
             find_library(${varName} NAMES ${libName})
         endif()
         if(NOT ${varName})
-            message(FATAL_ERROR "Required system library '${libName}' not found. Ensure the Windows SDK is installed (version 10.0.26100.0 or compatible). On GitHub Actions, ensure the runner image contains the required SDK. If self-hosted, use the Visual Studio Installer to add the Windows 10 SDK.")
+            message(FATAL_ERROR 
+                "Required system library '${libName}' not found.\n"
+                "Ensure the Windows SDK is installed (version 10.0.26100.0 or compatible).\n"
+                "- On GitHub Actions: Ensure the runner image contains the required SDK.\n"
+                "- If self-hosted: Use the Visual Studio Installer to add the Windows 10 SDK."
+            )
         endif()
         target_link_libraries(aifilesorter PRIVATE "${${varName}}")
     endforeach()
