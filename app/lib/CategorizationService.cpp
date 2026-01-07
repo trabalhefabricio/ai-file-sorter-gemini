@@ -666,9 +666,11 @@ std::future<std::string> CategorizationService::start_llm_future(
     FileType file_type,
     const std::string& consistency_context) const
 {
-    // Use std::async instead of detached thread to avoid dangling reference issues
-    // std::async properly manages the thread lifetime and ensures the task completes
-    // before the future is destroyed or the llm reference becomes invalid
+    // Use std::async instead of detached thread to avoid dangling reference issues.
+    // std::async properly manages the thread lifetime - the returned future will block
+    // in its destructor if not already retrieved, ensuring the task completes before
+    // the llm reference can become invalid. The caller (run_llm_with_timeout) immediately
+    // waits for the future, so the llm reference remains valid throughout the task.
     return std::async(std::launch::async, 
         [&llm, item_name, item_path, file_type, consistency_context]() -> std::string {
             return llm.categorize_file(item_name, item_path, file_type, consistency_context);
