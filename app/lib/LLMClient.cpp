@@ -16,6 +16,7 @@
 #include <sstream>
 #include <string>
 #include <utility>
+#include <fmt/format.h>
 
 // Helper function to write the response from curl into a string
 static size_t WriteCallback(void *contents, size_t size, size_t nmemb, std::string *response)

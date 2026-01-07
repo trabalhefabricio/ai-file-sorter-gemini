@@ -19,6 +19,7 @@
 #include <future>
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/fmt.h>
+#include <fmt/format.h>
 #include <QApplication>
 #include <QDesktopServices>
 #include <QMessageBox>
