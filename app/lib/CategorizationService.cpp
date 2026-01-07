@@ -62,7 +62,7 @@ LabelValidationResult validate_labels(const std::string& category, const std::st
         return {false, "Category or subcategory is a reserved name"};
     }
     if (StringUtils::has_leading_or_trailing_space(category) || StringUtils::has_leading_or_trailing_space(subcategory)) {
-        return {false, "Category or subcategory has leading/trailing space or dot"};
+        return {false, "Category or subcategory has leading/trailing whitespace"};
     }
     if (StringUtils::to_lower_copy(category) == StringUtils::to_lower_copy(subcategory)) {
         return {false, "Category and subcategory are identical"};

@@ -42,7 +42,7 @@ bool validate_labels(const std::string& category,
         return false;
     }
     if (StringUtils::has_leading_or_trailing_space(category) || StringUtils::has_leading_or_trailing_space(subcategory)) {
-        error = "Category or subcategory has leading/trailing space or dot";
+        error = "Category or subcategory has leading/trailing whitespace";
         return false;
     }
     return true;
