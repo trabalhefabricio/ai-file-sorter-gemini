@@ -232,7 +232,7 @@ void Updater::show_optional_update_dialog(const UpdateInfo& info, QWidget* paren
         if (!settings.save()) {
             updater_log(spdlog::level::err, "Failed to save skipped version to settings.");
         } else {
-            std::cout << "User chose to skip version " << info.current_version << "." << std::endl;
+            std::cout << "User chose to skip version " << info.current_version << ".\n";
         }
     } else if (box.clickedButton() == cancel_button) {
         // No action needed; user dismissed the dialog.
