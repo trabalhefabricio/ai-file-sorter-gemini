@@ -1,8 +1,21 @@
 # 📚 Reforking Documentation Index
 
 **Created:** January 6, 2026  
+**Updated:** January 7, 2026  
 **Purpose:** Guide you to the right document for your needs  
-**Total Documentation:** 2,387 lines across 3 documents
+**Total Documentation:** 3,755 lines across 7 documents
+
+---
+
+## ⚠️ MOST IMPORTANT CHANGE
+
+**Before doing anything else, understand this:**
+
+👉 **Read [CATEGORIZATION_PROMPT_CHANGES.md](CATEGORIZATION_PROMPT_CHANGES.md) FIRST** (10 minutes)
+
+This documents the **main categorization prompt** changes - the core sorting logic difference between the original fork and your custom version. **This is the #1 most important change** as it affects how every single file is categorized.
+
+**Without implementing this change first, your re-fork will sort files differently and lose the improved accuracy.**
 
 ---
 
@@ -11,15 +24,39 @@
 **Just tell me what to do:**  
 👉 Read [REFORKING_SUMMARY.md](REFORKING_SUMMARY.md) (5 minutes)
 
+**I want the feature implementation requests:**  
+👉 See [FEATURE_IMPLEMENTATION_REQUESTS.md](FEATURE_IMPLEMENTATION_REQUESTS.md) (project manager style)
+
 **I want to start implementing NOW:**  
 👉 Follow [QUICK_START_REFORKING.md](QUICK_START_REFORKING.md) (30 minutes to begin)
 
 **I need all the details and analysis:**  
 👉 Study [REFORKING_STRATEGY.md](REFORKING_STRATEGY.md) (comprehensive guide)
 
+**I want to understand the journey:**  
+👉 Read [NATURAL_LANGUAGE_REFORKING_GUIDE.md](NATURAL_LANGUAGE_REFORKING_GUIDE.md) (story format)
+
 ---
 
 ## 📖 Document Overview
+
+### 0. CATEGORIZATION_PROMPT_CHANGES.md (400 lines) ⚠️ READ FIRST
+**Read Time:** 10 minutes  
+**Importance:** **CRITICAL** - Most important change  
+**Purpose:** Documents the core sorting logic difference
+
+**What's inside:**
+- ⚠️ The #1 change that defines file sorting quality
+- ✅ Before/After prompt comparison
+- ✅ 5 key enhancements explained
+- ✅ Impact on categorization accuracy with examples
+- ✅ Exact code locations (LLMClient.cpp, GeminiClient.cpp)
+- ✅ Why this comes BEFORE all other features
+- ✅ Testing procedures
+
+**Read this if:** You want to understand the single most important difference (YOU SHOULD)
+
+---
 
 ### 1. REFORKING_SUMMARY.md (335 lines)
 **Read Time:** 5 minutes  
@@ -38,7 +75,24 @@
 
 ---
 
-### 2. QUICK_START_REFORKING.md (284 lines)
+### 2. FEATURE_IMPLEMENTATION_REQUESTS.md (844 lines)
+**Read Time:** 30 minutes  
+**Purpose:** Project manager style feature requests for implementation
+
+**What's inside:**
+- ✅ Feature #0: Enhanced Categorization Prompt (FOUNDATION)
+- ✅ 11 feature requests in plain text
+- ✅ Written as you'd brief a developer on your team
+- ✅ Focus on WHAT and WHY, not HOW
+- ✅ Background, requirements, acceptance criteria for each
+- ✅ Ordered: Modified features → New features → Utilities → Future
+- ✅ Complete coverage - no features left behind
+
+**Read this if:** You want feature descriptions to implement (or give to AI agents)
+
+---
+
+### 3. REFORKING_SUMMARY.md (335 lines)
 **Read Time:** 10 minutes  
 **Action Time:** 30 minutes to start implementing
 
@@ -56,7 +110,25 @@
 
 ---
 
-### 3. REFORKING_STRATEGY.md (1,768 lines)
+### 4. QUICK_START_REFORKING.md (284 lines)
+**Read Time:** 10 minutes  
+**Action Time:** 30 minutes to start implementing
+
+**What's inside:**
+- ✅ TL;DR: What to do
+- ✅ Step-by-step commands (copy-paste ready)
+- ✅ Feature extraction workflow
+- ✅ Fork & clone instructions
+- ✅ First feature walkthrough (Cache Manager)
+- ✅ Week-by-week implementation schedule
+- ✅ Command cheatsheet
+- ✅ Success checklist
+
+**Read this if:** You're ready to start working TODAY
+
+---
+
+### 5. REFORKING_STRATEGY.md (1,768 lines)
 **Read Time:** 60-90 minutes  
 **Reference Time:** Throughout your 6-8 week implementation
 

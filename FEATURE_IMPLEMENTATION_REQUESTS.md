@@ -5,6 +5,70 @@ These are feature requests written as you would ask a programmer on your team. E
 
 ---
 
+## ⚠️ FOUNDATION FEATURE (IMPLEMENT FIRST)
+
+### Feature Request 0: Enhanced Categorization Prompt with Intelligent Analysis
+
+**Background:**
+The original `hyperfield/ai-file-sorter` uses a simple prompt that asks the AI to categorize files based only on the filename. This approach misses critical signals like file extensions, path context, and file types, resulting in less accurate categorizations.
+
+**What We Need:**
+Enhance the AI categorization prompts in both OpenAI and Gemini clients to include intelligent file analysis. The AI should consider file type, extension semantics, path context, and provide confidence-based responses.
+
+**Why This Matters:**
+- **This is the #1 most important change** - it defines the quality of all file sorting
+- File extensions are the strongest signal for file purpose (.py = Python, .psd = Photoshop)
+- Path context provides critical hints (photos/vacation vs projects/code)
+- Confidence thresholds prevent bad guesses on ambiguous files
+- Purpose-based analysis produces smarter, more consistent categorizations
+- Without this change, the re-fork will categorize files like the original (less accurately)
+
+**Requirements:**
+
+1. **Enhanced System Prompt:**
+   - Define AI as "intelligent file categorization assistant"
+   - Instruct AI to analyze name, extension, and context
+   - Add confidence threshold: If uncertain (< 70%), respond "UNCERTAIN : [filename]"
+   - Otherwise respond with "Category : Subcategory"
+   - Maintain concise output format
+
+2. **Enhanced User Prompt:**
+   - Include file type (FILE, DIRECTORY, etc.) from FileType enum
+   - Include filename
+   - Include full path when available (provides context)
+   - Extract file extension if present
+
+3. **Structured Analysis Framework:**
+   - Explicitly ask AI to analyze: "What this file type (.extension) is typically used for"
+   - Explicitly ask AI to analyze: "The semantic meaning of the filename"  
+   - Explicitly ask AI to analyze: "Common purposes and applications for this file format"
+
+4. **Implementation Locations:**
+   - Update `LLMClient::make_categorization_payload()` in app/lib/LLMClient.cpp (lines ~396-438)
+   - Update `GeminiClient::make_categorization_payload()` in app/lib/GeminiClient.cpp (lines ~629-677)
+   - Both functions need identical prompt logic (OpenAI vs Gemini formatting differences only)
+
+**Acceptance Criteria:**
+- File "config.json" categorizes as Development/Configuration (not Documents/Data)
+- File "report.txt" categorizes with high confidence based on extension analysis
+- File "data.bin" returns UNCERTAIN (ambiguous binary file)
+- Path "photos/vacation/IMG_001.jpg" uses path context in decision
+- All files include extension analysis in prompt
+- UNCERTAIN responses properly handled by application
+
+**Technical Notes:**
+- This is code-level change in existing functions, not new files
+- FileType enum should already exist in original fork
+- Extension extraction: `file_name.find_last_of('.')` 
+- No UI changes required
+- Test with diverse file types: images, code, documents, binaries
+
+**Time Estimate:** 30 minutes to 1 hour (copy prompt text, test)
+
+**Reference:** See CATEGORIZATION_PROMPT_CHANGES.md for complete before/after comparison and detailed explanation.
+
+---
+
 ## MODIFIED FEATURES (Enhancements to Existing Code)
 
 ### Feature Request 1: Enhanced Persistent Undo System
