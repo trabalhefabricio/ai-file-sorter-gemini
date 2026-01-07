@@ -105,7 +105,7 @@ CurlRequest create_curl_request(const std::shared_ptr<spdlog::logger>& logger)
         const auto cert_path = Utils::ensure_ca_bundle();
         curl_easy_setopt(request.handle, CURLOPT_CAINFO, cert_path.string().c_str());
     } catch (const std::exception& ex) {
-        throw std::runtime_error(std::string("Failed to stage CA bundle: ") + ex.what());
+        throw std::runtime_error(fmt::format("Failed to stage CA bundle: {}", ex.what()));
     }
 #endif
     return request;

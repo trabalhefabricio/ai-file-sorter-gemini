@@ -261,7 +261,7 @@ std::string Updater::fetch_update_metadata() const {
         configure_tls(curl);
     } catch (const std::exception& ex) {
         curl_easy_cleanup(curl);
-        throw std::runtime_error(std::string("Failed to stage CA bundle: ") + ex.what());
+        throw std::runtime_error(fmt::format("Failed to stage CA bundle: {}", ex.what()));
     }
 
     curl_easy_setopt(curl, CURLOPT_URL, update_spec_file_url.c_str());
