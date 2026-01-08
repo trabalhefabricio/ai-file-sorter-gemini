@@ -506,8 +506,8 @@ QString resolve_ggml_directory(const QString& exeDir,
             nullptr,
             QObject::tr("Missing GGML Runtime"),
             QObject::tr("Could not locate the backend runtime DLLs.\nTried:\n%1\n%2")
-                .arg(QDir::toNativeSeparators(candidates.value(0)),
-                     QDir::toNativeSeparators(candidates.value(1))));
+                .arg(QDir::toNativeSeparators(candidates.value(0)))
+                .arg(QDir::toNativeSeparators(candidates.value(1))));
     }
     return QString();
 }
