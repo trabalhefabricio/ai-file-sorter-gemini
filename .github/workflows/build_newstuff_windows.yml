@@ -531,7 +531,7 @@ jobs:
               foreach ($pattern in $icuDllPatterns) {
                   $dlls = Get-ChildItem -Path $vcpkgBinPath -Filter $pattern -ErrorAction SilentlyContinue
                   foreach ($dll in $dlls) {
-                      Copy-Item -Path $dll.FullName -Destination "output" -Force
+                      Copy-Item -Path $dll.FullName -Destination "output\" -Force
                       Write-Host "[OK] Copied: $($dll.Name)"
                       $icuDllsFound = $true
                   }
