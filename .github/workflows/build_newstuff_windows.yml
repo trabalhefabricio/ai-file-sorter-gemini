@@ -550,6 +550,27 @@ jobs:
             Write-Warning "app\lib\precompiled not found"
           }
           
+          # Copy GGML DLLs to root output directory for runtime discovery
+          # The executables need these DLLs in the same directory or on PATH
+          Write-Host "`n=== Copying GGML DLLs to output root directory ==="
+          $ggmlDllSources = @(
+            "app\lib\ggml\wocuda\*.dll",
+            "app\lib\precompiled\cpu\bin\*.dll"
+          )
+          
+          foreach ($pattern in $ggmlDllSources) {
+            if (Test-Path $pattern) {
+              $files = Get-ChildItem -Path $pattern -File -ErrorAction SilentlyContinue
+              foreach ($file in $files) {
+                # Skip libcurl.dll as it's already copied from vcpkg
+                if ($file.Name -ne "libcurl.dll") {
+                  Copy-Item $file.FullName "output\" -Force
+                  Write-Host "[OK] Copied $($file.Name) to output root"
+                }
+              }
+            }
+          }
+          
           # Verify lib directory structure was copied
           $libDirs = @("output\lib\ggml", "output\lib\precompiled\cpu\bin")
           foreach ($dir in $libDirs) {
@@ -565,7 +586,18 @@ jobs:
         shell: powershell
         run: |
           $outputDir = "$env:GITHUB_WORKSPACE\output"
-          $criticalFiles = @("aifilesorter.exe", "Qt6Core.dll", "Qt6Gui.dll", "Qt6Widgets.dll")
+          $criticalFiles = @(
+            "aifilesorter.exe", 
+            "StartAiFileSorter.exe",
+            "Qt6Core.dll", 
+            "Qt6Gui.dll", 
+            "Qt6Widgets.dll",
+            "ggml.dll",
+            "ggml-base.dll",
+            "ggml-cpu.dll",
+            "llama.dll",
+            "intl-8.dll"
+          )
 
           Write-Host "=== Verifying critical files ==="
           $missingFiles = @()
@@ -575,13 +607,14 @@ jobs:
               $missingFiles += $file
               Write-Warning "Missing critical file in bundle: $file"
             } else {
-              Write-Host "[OK] Found: $file"
+              $fileSize = (Get-Item $filePath).Length
+              Write-Host "[OK] Found: $file ($([math]::Round($fileSize/1KB, 2)) KB)"
             }
           }
 
           if ($missingFiles.Count -gt 0) {
-            Write-Error ("Bundle verification failed: Missing $($missingFiles.Count) critical files. " + `
-                        "This usually means windeployqt or dependency copying failed. " + `
+            Write-Error ("Bundle verification failed: Missing $($missingFiles.Count) critical files: $($missingFiles -join ', '). " + `
+                        "This usually means DLL copying failed. " + `
                         "Check the 'Bundle Files' step logs for errors.")
             exit 1
           }
