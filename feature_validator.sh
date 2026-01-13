@@ -398,7 +398,8 @@ fi
 print_header "SECURITY CHECKS"
 
 print_test "API key handling"
-if grep -r "api.*key" app/include/*.hpp app/lib/*.cpp 2>/dev/null | grep -v "API key" | grep -v "api_key" | head -n 1 > /dev/null; then
+API_KEY_REFS=$(grep -r "api.*key" app/include/*.hpp app/lib/*.cpp 2>/dev/null | grep -v "API key" | grep -v "api_key" | head -n 1)
+if [ -n "$API_KEY_REFS" ]; then
     warn "Found potential hardcoded API key references (review needed)"
 else
     pass "No obvious hardcoded API keys found"

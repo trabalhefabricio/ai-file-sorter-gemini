@@ -310,6 +310,10 @@ class TestAggregator:
         .status-warning {{ background: #ff9800; color: white; }}
         .status-fail {{ background: #f44336; color: white; }}
         .status-info {{ background: #2196f3; color: white; }}
+        .status-excellent {{ background: #4caf50; color: white; }}
+        .status-good {{ background: #8bc34a; color: white; }}
+        .status-needs-attention {{ background: #ff9800; color: white; }}
+        .status-critical {{ background: #f44336; color: white; }}
         table {{
             width: 100%;
             border-collapse: collapse;

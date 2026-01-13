@@ -243,10 +243,11 @@ class DiagnosticTool:
             lib_path = lib_dir / lib
             if lib_path.exists():
                 size = lib_path.stat().st_size
+                size_kb = max(1, size // 1024)  # At least 1 KB for display
                 self.add_result(
                     f"Library: {lib}",
                     "OK",
-                    f"Found ({size // 1024} KB)",
+                    f"Found ({size_kb} KB)",
                     f"Path: {lib_path}"
                 )
             else:
@@ -654,7 +655,8 @@ class DiagnosticTool:
         
         # Check memory (approximate)
         try:
-            if self.platform != "Windows":
+            if self.platform == "Linux":
+                # Linux-specific memory check
                 with open('/proc/meminfo', 'r') as f:
                     meminfo = f.read()
                     for line in meminfo.splitlines():
@@ -668,11 +670,35 @@ class DiagnosticTool:
                                 None
                             )
                             break
+            elif self.platform == "Darwin":
+                # macOS memory check
+                try:
+                    import subprocess
+                    result = subprocess.run(['sysctl', 'hw.memsize'], capture_output=True, text=True)
+                    if result.returncode == 0:
+                        mem_bytes = int(result.stdout.split()[1])
+                        total_gb = mem_bytes / (1024**3)
+                        status = "OK" if total_gb > 4 else "WARNING"
+                        self.add_result(
+                            "System Memory",
+                            status,
+                            f"{total_gb:.1f} GB total",
+                            None
+                        )
+                    else:
+                        raise Exception("sysctl failed")
+                except Exception:
+                    self.add_result(
+                        "System Memory",
+                        "INFO",
+                        "Could not check memory on macOS",
+                        None
+                    )
             else:
                 self.add_result(
                     "System Memory",
                     "INFO",
-                    "Memory check not implemented for Windows",
+                    "Memory check not implemented for this platform",
                     None
                 )
         except Exception as e:
