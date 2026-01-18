@@ -171,7 +171,7 @@ Tests source code presence for ALL features:
 
 ### 8. Internationalization ✓
 - **Translation Files** - Available languages
-- **Supported Languages:** Dutch, French, German, Italian, Polish, Portuguese, Spanish, Turkish
+- **Supported Languages:** German (de), Spanish (es), Italian (it), French (fr), Turkish (tr)
 
 ### 9. Log Files & Error Reporting ✓
 - **Log Directory** - Location and contents

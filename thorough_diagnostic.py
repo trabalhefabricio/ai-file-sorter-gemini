@@ -634,36 +634,36 @@ class ThoroughDiagnosticTool:
         
         # Check database integrity
         try:
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            
-            # Integrity check
-            try:
-                cursor.execute("PRAGMA integrity_check")
-                integrity = cursor.fetchone()[0]
-                if integrity == "ok":
-                    self.add_result(
-                        "Database Integrity",
-                        "OK",
-                        "Passed integrity check",
-                        category=category
-                    )
-                else:
+            with sqlite3.connect(db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Integrity check
+                try:
+                    cursor.execute("PRAGMA integrity_check")
+                    integrity = cursor.fetchone()[0]
+                    if integrity == "ok":
+                        self.add_result(
+                            "Database Integrity",
+                            "OK",
+                            "Passed integrity check",
+                            category=category
+                        )
+                    else:
+                        self.add_result(
+                            "Database Integrity",
+                            "FAIL",
+                            "Integrity check failed",
+                            integrity,
+                            recommendation="Database may be corrupted. Consider backup and repair.",
+                            category=category
+                        )
+                except sqlite3.Error as e:
                     self.add_result(
                         "Database Integrity",
                         "FAIL",
-                        "Integrity check failed",
-                        integrity,
-                        recommendation="Database may be corrupted. Consider backup and repair.",
+                        f"Error checking integrity: {str(e)}",
                         category=category
                     )
-            except sqlite3.Error as e:
-                self.add_result(
-                    "Database Integrity",
-                    "FAIL",
-                    f"Error checking integrity: {str(e)}",
-                    category=category
-                )
             
             # Check tables
             try:
@@ -732,8 +732,6 @@ class ThoroughDiagnosticTool:
                     f"Error querying schema: {str(e)}",
                     category=category
                 )
-            
-            conn.close()
             
         except sqlite3.Error as e:
             self.add_result(
@@ -1087,31 +1085,34 @@ class ThoroughDiagnosticTool:
                 test_file = self.data_dir / ".diagnostic_test"
                 test_data = b"0" * (1024 * 1024)  # 1MB
                 
-                start = time.time()
-                with open(test_file, 'wb') as f:
-                    f.write(test_data)
-                write_time = time.time() - start
-                
-                start = time.time()
-                with open(test_file, 'rb') as f:
-                    _ = f.read()
-                read_time = time.time() - start
-                
-                test_file.unlink()
-                
-                write_speed = 1.0 / write_time  # MB/s
-                read_speed = 1.0 / read_time  # MB/s
-                
-                status = "OK" if write_speed > 50 and read_speed > 100 else "WARNING"
-                rec = "Slow disk I/O may affect performance" if status == "WARNING" else None
-                
-                self.add_result(
-                    "Disk I/O Performance",
-                    status,
-                    f"Write: {write_speed:.0f} MB/s, Read: {read_speed:.0f} MB/s",
-                    recommendation=rec,
-                    category=category
-                )
+                try:
+                    start = time.time()
+                    with open(test_file, 'wb') as f:
+                        f.write(test_data)
+                    write_time = time.time() - start
+                    
+                    start = time.time()
+                    with open(test_file, 'rb') as f:
+                        _ = f.read()
+                    read_time = time.time() - start
+                    
+                    write_speed = 1.0 / write_time  # MB/s
+                    read_speed = 1.0 / read_time  # MB/s
+                    
+                    status = "OK" if write_speed > 50 and read_speed > 100 else "WARNING"
+                    rec = "Slow disk I/O may affect performance" if status == "WARNING" else None
+                    
+                    self.add_result(
+                        "Disk I/O Performance",
+                        status,
+                        f"Write: {write_speed:.0f} MB/s, Read: {read_speed:.0f} MB/s",
+                        recommendation=rec,
+                        category=category
+                    )
+                finally:
+                    # Ensure test file is always deleted
+                    if test_file.exists():
+                        test_file.unlink()
             except Exception as e:
                 self.add_result(
                     "Disk I/O Performance",
@@ -1366,6 +1367,7 @@ class ThoroughDiagnosticTool:
     
     def generate_html_report(self, json_report: dict, output_file: str):
         """Generate HTML report"""
+        from pathlib import Path
         html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1740,11 +1742,13 @@ Examples:
     json_report = tool.generate_json_report(json_file)
     
     if args.html:
-        html_file = json_file.replace('.json', '.html')
+        # Properly replace extension using pathlib
+        html_file = str(Path(json_file).with_suffix('.html'))
         tool.generate_html_report(json_report, html_file)
     
     if args.markdown:
-        md_file = json_file.replace('.json', '.md')
+        # Properly replace extension using pathlib
+        md_file = str(Path(json_file).with_suffix('.md'))
         tool.generate_markdown_summary(json_report, md_file)
     
     # Print summary
