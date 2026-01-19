@@ -52,6 +52,7 @@ File content–based sorting for certain file types is also in development.
 
 - [AI File Sorter](#ai-file-sorter)
   - [Changelog](#changelog)
+  - [Features Summary](#features-summary)
   - [Features](#features)
   - [Categorization](#categorization)
     - [Categorization modes](#categorization-modes)
@@ -83,6 +84,17 @@ File content–based sorting for certain file types is also in development.
 - A few more guard rails added.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full history.
+
+---
+
+## Features Summary
+
+For a comprehensive list of all implemented features (organized by version) and features currently in development or planned, see [FEATURES_SUMMARY.md](FEATURES_SUMMARY.md).
+
+**Quick Overview:**
+- **40+ implemented features** across 8 major versions
+- **In Development:** Content-based sorting for certain file types
+- **Planned:** Native Windows build documentation
 
 ---
 
