@@ -1,6 +1,10 @@
-# AI File Sorter - Features Summary
+# AI File Sorter - Features Summary (Original Repository)
 
-This document provides a comprehensive overview of implemented and planned features for AI File Sorter.
+This document provides a comprehensive overview of features in the **original hyperfield/ai-file-sorter repository**.
+
+For **custom features added in this fork (trabalhefabricio/ai-file-sorter-iconic)**, see [FORK_FEATURES.md](FORK_FEATURES.md).
+
+---
 
 ## Currently Implemented Features
 
