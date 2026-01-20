@@ -52,7 +52,6 @@ File content–based sorting for certain file types is also in development.
 
 - [AI File Sorter](#ai-file-sorter)
   - [Changelog](#changelog)
-  - [Features Summary](#features-summary)
   - [Features](#features)
   - [Categorization](#categorization)
     - [Categorization modes](#categorization-modes)
@@ -84,23 +83,6 @@ File content–based sorting for certain file types is also in development.
 - A few more guard rails added.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full history.
-
----
-
-## Fork-Specific Features
-
-This is a fork of the original [hyperfield/ai-file-sorter](https://github.com/hyperfield/ai-file-sorter) repository with custom enhancements.
-
-**See [FORK_FEATURES.md](FORK_FEATURES.md) for a complete list of custom features added in this fork.**
-
-**Fork Highlights:**
-- **17 fully implemented custom features** including User Profiling, File Tinder, API Usage Tracking
-- **Enhanced Gemini API** with sophisticated rate limiting for free tier
-- **Comprehensive diagnostic tools** and testing framework
-- **10 additional features** in development or planning
-- **35+ documentation files** created
-
-For the original repository features, see [FEATURES_SUMMARY.md](FEATURES_SUMMARY.md).
 
 ---
 
