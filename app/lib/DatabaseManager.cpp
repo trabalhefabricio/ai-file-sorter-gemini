@@ -204,6 +204,23 @@ void DatabaseManager::initialize_schema() {
         db_log(spdlog::level::err, "Failed to create taxonomy index: {}", error_msg);
         sqlite3_free(error_msg);
     }
+
+    // File Tinder state table
+    const char *file_tinder_sql = R"(
+        CREATE TABLE IF NOT EXISTS file_tinder_state (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            folder_path TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            decision TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            CHECK(decision IN ('keep', 'delete', 'ignore', 'pending')),
+            UNIQUE(folder_path, file_path)
+        );
+    )";
+    if (sqlite3_exec(db, file_tinder_sql, nullptr, nullptr, &error_msg) != SQLITE_OK) {
+        db_log(spdlog::level::err, "Failed to create file_tinder_state table: {}", error_msg);
+        sqlite3_free(error_msg);
+    }
 }
 
 void DatabaseManager::initialize_taxonomy_schema() {
@@ -1045,4 +1062,91 @@ bool DatabaseManager::file_exists_in_db(const std::string &file_name, const std:
     bool exists = sqlite3_step(stmt) == SQLITE_ROW;
     sqlite3_finalize(stmt);
     return exists;
+}
+
+// File Tinder methods implementation
+bool DatabaseManager::save_tinder_decision(const FileTinderDecision& decision) {
+    if (!db) return false;
+
+    const char *sql = R"(
+        INSERT INTO file_tinder_state (folder_path, file_path, decision)
+        VALUES (?, ?, ?)
+        ON CONFLICT(folder_path, file_path) DO UPDATE SET
+            decision = excluded.decision,
+            timestamp = CURRENT_TIMESTAMP;
+    )";
+
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        db_log(spdlog::level::err, "Failed to prepare save tinder decision: {}", sqlite3_errmsg(db));
+        return false;
+    }
+
+    sqlite3_bind_text(stmt, 1, decision.folder_path.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, decision.file_path.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, decision.decision.c_str(), -1, SQLITE_TRANSIENT);
+
+    bool success = sqlite3_step(stmt) == SQLITE_DONE;
+    sqlite3_finalize(stmt);
+    return success;
+}
+
+std::vector<DatabaseManager::FileTinderDecision> DatabaseManager::get_tinder_decisions(
+    const std::string& folder_path) {
+    std::vector<FileTinderDecision> decisions;
+    if (!db) return decisions;
+
+    const char *sql = R"(
+        SELECT folder_path, file_path, decision, timestamp
+        FROM file_tinder_state
+        WHERE folder_path = ?
+        ORDER BY timestamp DESC;
+    )";
+
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        db_log(spdlog::level::err, "Failed to prepare get tinder decisions: {}", sqlite3_errmsg(db));
+        return decisions;
+    }
+
+    sqlite3_bind_text(stmt, 1, folder_path.c_str(), -1, SQLITE_TRANSIENT);
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        FileTinderDecision decision;
+        const char *folder = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+        const char *file = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+        const char *dec = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+        const char *ts = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+        
+        decision.folder_path = folder ? folder : "";
+        decision.file_path = file ? file : "";
+        decision.decision = dec ? dec : "";
+        decision.timestamp = ts ? ts : "";
+        decisions.push_back(decision);
+    }
+
+    sqlite3_finalize(stmt);
+    return decisions;
+}
+
+bool DatabaseManager::clear_tinder_session(const std::string& folder_path) {
+    if (!db) return false;
+
+    const char *sql = "DELETE FROM file_tinder_state WHERE folder_path = ?;";
+
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        db_log(spdlog::level::err, "Failed to prepare clear tinder session: {}", sqlite3_errmsg(db));
+        return false;
+    }
+
+    sqlite3_bind_text(stmt, 1, folder_path.c_str(), -1, SQLITE_TRANSIENT);
+    bool success = sqlite3_step(stmt) == SQLITE_DONE;
+    
+    if (!success) {
+        db_log(spdlog::level::err, "Failed to clear tinder session for folder: {}", folder_path);
+    }
+    
+    sqlite3_finalize(stmt);
+    return success;
 }
