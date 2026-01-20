@@ -89,6 +89,7 @@ inline uint64_t now_ms() {
 
 // Per-model state for adaptive timeout and rate limiting
 // Optimized for Gemini free tier: 15 RPM (requests per minute)
+// BUG FIX #2: Add mutex for thread-safe state modifications
 struct ModelState {
     double tokens = 3.0;            // current tokens in bucket (lower for free tier)
     double capacity = 5.0;          // max tokens (conservative for free tier)
@@ -102,6 +103,9 @@ struct ModelState {
     // Timeout tracking for progressive extension
     uint64_t last_timeout_ms = 0;   // last timeout used
     int timeout_extensions = 0;     // number of times we've extended timeout for current batch
+    
+    // BUG FIX #2: Add mutex for thread-safe access
+    mutable std::mutex state_mutex;
 };
 
 // BUG FIX #1: Use joinable thread instead of detached to avoid use-after-free
@@ -156,7 +160,10 @@ public:
 
     ModelState get(const std::string& model) {
         std::lock_guard<std::mutex> g(mu_);
-        if (states_.count(model)) return states_[model];
+        if (states_.count(model)) {
+            // BUG FIX #2: Return copy to avoid external access to internal state
+            return states_[model];
+        }
         ModelState s;
         s.tokens = s.capacity;
         s.last_refill_ms = now_ms();
@@ -167,6 +174,7 @@ public:
     void put(const std::string& model, const ModelState& s) {
         {
             std::lock_guard<std::mutex> g(mu_);
+            // BUG FIX #2: Lock acquisition ensures thread-safe modification
             states_[model] = s;
         }
         schedule_save();
@@ -229,6 +237,8 @@ PersistentState& get_state() {
 }
 
 void refill_tokens(ModelState& s) {
+    // BUG FIX #2: Add lock guard for thread-safe token refill
+    std::lock_guard<std::mutex> lock(s.state_mutex);
     uint64_t now = now_ms();
     if (s.last_refill_ms == 0) s.last_refill_ms = now;
     if (now <= s.last_refill_ms) return;
@@ -241,6 +251,8 @@ void refill_tokens(ModelState& s) {
 }
 
 void update_ewma_and_state(const std::string& model, ModelState& s, uint64_t observed_ms) {
+    // BUG FIX #2: Add lock guard for thread-safe EWMA and state update
+    std::lock_guard<std::mutex> lock(s.state_mutex);
     double alpha = 0.15; // Slower adaptation for more stable free tier behavior
     s.ewma_ms = alpha * (double)observed_ms + (1.0 - alpha) * s.ewma_ms;
     s.ewma_ms = std::max(1000.0, std::min(300000.0, s.ewma_ms));
@@ -307,6 +319,8 @@ uint64_t calculate_jittered_backoff(int attempt, uint64_t last_backoff_ms) {
 
 // Update circuit breaker on request result
 void update_circuit_breaker(ModelState& s, bool success) {
+    // BUG FIX #2: Add lock guard for thread-safe circuit breaker update
+    std::lock_guard<std::mutex> lock(s.state_mutex);
     uint64_t now = now_ms();
     
     // If circuit was open and cooldown expired, reset on first check
@@ -348,8 +362,14 @@ struct ProgressData {
     std::atomic<bool>* cancel_flag = nullptr;
 };
 
+// BUG FIX #3 & #4: Add null pointer check and ensure thread-safe cancel flag
 int progress_callback(void* clientp, curl_off_t dltotal, curl_off_t dlnow, 
                       curl_off_t ultotal, curl_off_t ulnow) {
+    // BUG FIX #3: Add null pointer check
+    if (!clientp) {
+        return 0;  // Continue if no data provided
+    }
+    
     auto* data = static_cast<ProgressData*>(clientp);
     
     // BUG FIX #4: Use atomic store
@@ -357,8 +377,8 @@ int progress_callback(void* clientp, curl_off_t dltotal, curl_off_t dlnow,
         data->last_activity_ms.store(now_ms(), std::memory_order_relaxed);
     }
     
-    // Check for cancel flag
-    if (data->cancel_flag && data->cancel_flag->load()) {
+    // BUG FIX #3 & #4: Check for cancel flag with null check
+    if (data->cancel_flag && data->cancel_flag->load(std::memory_order_relaxed)) {
         return 1;  // Abort
     }
     

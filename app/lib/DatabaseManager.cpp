@@ -69,7 +69,12 @@ using StatementPtr = std::unique_ptr<sqlite3_stmt, StatementDeleter>;
 
 StatementPtr prepare_statement(sqlite3* db, const char* sql) {
     sqlite3_stmt* raw = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &raw, nullptr) != SQLITE_OK) {
+    int rc = sqlite3_prepare_v2(db, sql, -1, &raw, nullptr);
+    if (rc != SQLITE_OK) {
+        // BUG FIX #7: Clean up partial allocation even on failure
+        if (raw) {
+            sqlite3_finalize(raw);
+        }
         return StatementPtr{};
     }
     return StatementPtr(raw);
@@ -86,18 +91,30 @@ bool has_label_content(const std::string& value) {
     return !trim_copy(value).empty();
 }
 
+// BUG FIX #7: Explicit null handling with validation
 std::optional<CategorizedFile> build_categorized_entry(sqlite3_stmt* stmt) {
+    // BUG FIX #7: Validate stmt is not null
+    if (!stmt) {
+        return std::nullopt;
+    }
+    
     const char *file_dir_path = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
     const char *file_name = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 1));
     const char *file_type = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 2));
     const char *category = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 3));
     const char *subcategory = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 4));
 
-    std::string dir_path = file_dir_path ? file_dir_path : "";
-    std::string name = file_name ? file_name : "";
-    std::string type_str = file_type ? file_type : "";
-    std::string cat = category ? category : "";
-    std::string subcat = subcategory ? subcategory : "";
+    // BUG FIX #7: Explicitly validate all required fields are not null
+    if (!file_dir_path || !file_name || !file_type || !category || !subcategory) {
+        db_log(spdlog::level::warn, "Database row contains null required fields, skipping entry");
+        return std::nullopt;
+    }
+
+    std::string dir_path = file_dir_path;
+    std::string name = file_name;
+    std::string type_str = file_type;
+    std::string cat = category;
+    std::string subcat = subcategory;
 
     if (!has_label_content(cat) || !has_label_content(subcat)) {
         return std::nullopt;
@@ -154,7 +171,11 @@ DatabaseManager::~DatabaseManager() {
 }
 
 void DatabaseManager::initialize_schema() {
-    if (!db) return;
+    // BUG FIX #9: Check database initialization before proceeding
+    if (!db) {
+        db_log(spdlog::level::err, "Cannot initialize schema: database not initialized");
+        return;
+    }
 
     const char *create_table_sql = R"(
         CREATE TABLE IF NOT EXISTS file_categorization (
@@ -172,9 +193,14 @@ void DatabaseManager::initialize_schema() {
     )";
 
     char *error_msg = nullptr;
+    // BUG FIX #9: Check return value and log specific error
     if (sqlite3_exec(db, create_table_sql, nullptr, nullptr, &error_msg) != SQLITE_OK) {
-        db_log(spdlog::level::err, "Failed to create file_categorization table: {}", error_msg);
-        sqlite3_free(error_msg);
+        db_log(spdlog::level::err, "Failed to create file_categorization table: {}", 
+               error_msg ? error_msg : "unknown error");
+        if (error_msg) {
+            sqlite3_free(error_msg);
+        }
+        return;  // BUG FIX #9: Stop if table creation fails
     }
 
     const char *add_column_sql = "ALTER TABLE file_categorization ADD COLUMN taxonomy_id INTEGER;";
@@ -201,8 +227,10 @@ void DatabaseManager::initialize_schema() {
     const char *create_index_sql =
         "CREATE INDEX IF NOT EXISTS idx_file_categorization_taxonomy ON file_categorization(taxonomy_id);";
     if (sqlite3_exec(db, create_index_sql, nullptr, nullptr, &error_msg) != SQLITE_OK) {
-        db_log(spdlog::level::err, "Failed to create taxonomy index: {}", error_msg);
-        sqlite3_free(error_msg);
+        db_log(spdlog::level::err, "Failed to create taxonomy index: {}", error_msg ? error_msg : "unknown error");
+        if (error_msg) {
+            sqlite3_free(error_msg);
+        }
     }
 
     // File Tinder state table
@@ -218,8 +246,10 @@ void DatabaseManager::initialize_schema() {
         );
     )";
     if (sqlite3_exec(db, file_tinder_sql, nullptr, nullptr, &error_msg) != SQLITE_OK) {
-        db_log(spdlog::level::err, "Failed to create file_tinder_state table: {}", error_msg);
-        sqlite3_free(error_msg);
+        db_log(spdlog::level::err, "Failed to create file_tinder_state table: {}", error_msg ? error_msg : "unknown error");
+        if (error_msg) {
+            sqlite3_free(error_msg);
+        }
     }
 }
 
@@ -274,6 +304,15 @@ void DatabaseManager::load_taxonomy_cache() {
 
     if (!db) return;
 
+    // BUG FIX #8: Use transaction for atomic taxonomy cache loading
+    char* error_msg = nullptr;
+    if (sqlite3_exec(db, "BEGIN TRANSACTION;", nullptr, nullptr, &error_msg) != SQLITE_OK) {
+        db_log(spdlog::level::err, "Failed to begin transaction for taxonomy cache: {}", 
+               error_msg ? error_msg : "unknown error");
+        if (error_msg) sqlite3_free(error_msg);
+        return;
+    }
+
     sqlite3_stmt *stmt = nullptr;
     const char *select_taxonomy =
         "SELECT id, canonical_category, canonical_subcategory, "
@@ -294,6 +333,9 @@ void DatabaseManager::load_taxonomy_cache() {
         }
     } else {
         db_log(spdlog::level::err, "Failed to load taxonomy cache: {}", sqlite3_errmsg(db));
+        sqlite3_finalize(stmt);
+        sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr);
+        return;
     }
     if (stmt) sqlite3_finalize(stmt);
 
@@ -309,8 +351,19 @@ void DatabaseManager::load_taxonomy_cache() {
         }
     } else {
         db_log(spdlog::level::err, "Failed to load category aliases: {}", sqlite3_errmsg(db));
+        sqlite3_finalize(stmt);
+        sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr);
+        return;
     }
     if (stmt) sqlite3_finalize(stmt);
+    
+    // BUG FIX #8: Commit transaction
+    if (sqlite3_exec(db, "COMMIT;", nullptr, nullptr, &error_msg) != SQLITE_OK) {
+        db_log(spdlog::level::err, "Failed to commit taxonomy cache transaction: {}", 
+               error_msg ? error_msg : "unknown error");
+        if (error_msg) sqlite3_free(error_msg);
+        sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr);
+    }
 }
 
 std::string DatabaseManager::normalize_label(const std::string &input) const {

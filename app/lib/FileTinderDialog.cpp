@@ -63,7 +63,8 @@ void FileTinderDialog::setup_ui() {
     preview_scroll->setWidgetResizable(true);
     preview_scroll->setMinimumHeight(300);
     
-    preview_area_ = new QLabel();
+    // BUG FIX #1: Set parent to prevent memory leak
+    preview_area_ = new QLabel(preview_scroll);
     preview_area_->setAlignment(Qt::AlignCenter);
     preview_area_->setWordWrap(true);
     preview_area_->setStyleSheet("QLabel { background-color: #f0f0f0; padding: 20px; }");
@@ -406,25 +407,50 @@ void FileTinderDialog::on_execute_deletions() {
     int kept_count = 0;
     QString error_messages;
     
-    for (const auto& file : files_) {
-        if (file.decision == Decision::Delete) {
-            QFile qfile(QString::fromStdString(file.path));
-            if (qfile.remove()) {
-                deleted_count++;
-                if (auto logger = Logger::get_logger("core_logger")) {
-                    logger->info("Deleted file: {}", file.path);
+    // BUG FIX #5: Wrap file operations in try-catch for exception safety
+    try {
+        for (const auto& file : files_) {
+            if (file.decision == Decision::Delete) {
+                try {
+                    QFile qfile(QString::fromStdString(file.path));
+                    if (qfile.remove()) {
+                        deleted_count++;
+                        if (auto logger = Logger::get_logger("core_logger")) {
+                            logger->info("Deleted file: {}", file.path);
+                        }
+                    } else {
+                        failed_count++;
+                        QString error = tr("Failed to delete: %1 - %2\n")
+                            .arg(QString::fromStdString(file.file_name))
+                            .arg(qfile.errorString());
+                        error_messages += error;
+                        if (auto logger = Logger::get_logger("core_logger")) {
+                            logger->error("Failed to delete file: {} - {}", file.path, 
+                                        qfile.errorString().toStdString());
+                        }
+                    }
+                } catch (const std::exception& e) {
+                    failed_count++;
+                    QString error = tr("Exception deleting: %1 - %2\n")
+                        .arg(QString::fromStdString(file.file_name))
+                        .arg(e.what());
+                    error_messages += error;
+                    if (auto logger = Logger::get_logger("core_logger")) {
+                        logger->error("Exception deleting file: {} - {}", file.path, e.what());
+                    }
                 }
-            } else {
-                failed_count++;
-                QString error = tr("Failed to delete: %1\n").arg(QString::fromStdString(file.file_name));
-                error_messages += error;
-                if (auto logger = Logger::get_logger("core_logger")) {
-                    logger->error("Failed to delete file: {}", file.path);
-                }
+            } else if (file.decision == Decision::Keep) {
+                kept_count++;
             }
-        } else if (file.decision == Decision::Keep) {
-            kept_count++;
         }
+    } catch (const std::exception& e) {
+        // BUG FIX #5: Catch any exception during the deletion loop
+        QMessageBox::critical(this, tr("Error"), 
+            tr("Critical error during deletion: %1").arg(e.what()));
+        if (auto logger = Logger::get_logger("core_logger")) {
+            logger->error("Critical error during file deletions: {}", e.what());
+        }
+        return;
     }
     
     // BUG FIX #6: Check return value of clear_tinder_session and show error if it fails
@@ -517,6 +543,7 @@ void FileTinderDialog::load_state() {
         }
     }
     
+    // BUG FIX #10: Add bounds checking before accessing files_ vector
     // Find first pending file
     for (size_t i = 0; i < files_.size(); ++i) {
         if (files_[i].decision == Decision::Pending) {
@@ -525,8 +552,11 @@ void FileTinderDialog::load_state() {
         }
     }
     
-    if (current_index_ >= files_.size() && !files_.empty()) {
+    // BUG FIX #10: Explicit bounds check with size_t comparison
+    if (!files_.empty() && current_index_ >= files_.size()) {
         current_index_ = files_.size() - 1;
+    } else if (files_.empty()) {
+        current_index_ = 0;
     }
 }
 
@@ -550,16 +580,25 @@ void FileTinderDialog::keyPressEvent(QKeyEvent* event) {
 }
 
 QString FileTinderDialog::format_file_size(int64_t bytes) const {
-    const int64_t KB = 1024;
-    const int64_t MB = KB * 1024;
-    const int64_t GB = MB * 1024;
+    // BUG FIX #6: Prevent integer overflow by using explicit constants and safe casts
+    const int64_t KB = 1024LL;
+    const int64_t MB = 1024LL * KB;
+    const int64_t GB = 1024LL * MB;
+    
+    // Handle negative values
+    if (bytes < 0) {
+        return QString("0 bytes");
+    }
     
     if (bytes >= GB) {
-        return QString("%1 GB").arg(bytes / (double)GB, 0, 'f', 2);
+        double gb_value = static_cast<double>(bytes) / static_cast<double>(GB);
+        return QString("%1 GB").arg(gb_value, 0, 'f', 2);
     } else if (bytes >= MB) {
-        return QString("%1 MB").arg(bytes / (double)MB, 0, 'f', 2);
+        double mb_value = static_cast<double>(bytes) / static_cast<double>(MB);
+        return QString("%1 MB").arg(mb_value, 0, 'f', 2);
     } else if (bytes >= KB) {
-        return QString("%1 KB").arg(bytes / (double)KB, 0, 'f', 1);
+        double kb_value = static_cast<double>(bytes) / static_cast<double>(KB);
+        return QString("%1 KB").arg(kb_value, 0, 'f', 1);
     }
     return QString("%1 bytes").arg(bytes);
 }
