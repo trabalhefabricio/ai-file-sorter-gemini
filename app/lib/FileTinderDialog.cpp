@@ -464,6 +464,8 @@ void FileTinderDialog::on_execute_deletions() {
 
 void FileTinderDialog::save_state() {
     // Save current state to database for session resumption
+    bool any_save_failed = false;
+    
     for (const auto& file : files_) {
         if (file.decision == Decision::Pending) continue;
         
@@ -478,7 +480,19 @@ void FileTinderDialog::save_state() {
             default: decision.decision = "pending"; break;
         }
         
-        db_.save_tinder_decision(decision);
+        if (!db_.save_tinder_decision(decision)) {
+            any_save_failed = true;
+            if (auto logger = Logger::get_logger("core_logger")) {
+                logger->warn("Failed to save tinder decision for file: {}", file.path);
+            }
+        }
+    }
+    
+    // Only notify user if saves failed (don't interrupt workflow for background saves)
+    if (any_save_failed) {
+        if (auto logger = Logger::get_logger("core_logger")) {
+            logger->error("Some tinder decisions failed to save to database");
+        }
     }
 }
 

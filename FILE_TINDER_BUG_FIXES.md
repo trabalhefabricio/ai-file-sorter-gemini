@@ -107,12 +107,43 @@ Added comprehensive error logging to all File Tinder database operations:
 
 ## New Bugs Discovered
 
-### No Critical Bugs Found ✓
-During the implementation and review, no new bugs were discovered. The code follows best practices:
-- Proper null checking on Qt widget operations
-- Resource cleanup (sqlite3_finalize always called)
-- Error handling for all database operations
-- Logging for all error conditions
+### Bug #13: Unchecked Database Save Operations (LOW Severity)
+**Location:** `app/lib/FileTinderDialog.cpp:481` (original implementation)
+
+**Issue:**
+The `save_state()` method was calling `db_.save_tinder_decision(decision)` without checking the return value, similar to Bug #6.
+
+**Fix Applied:**
+```cpp
+void FileTinderDialog::save_state() {
+    bool any_save_failed = false;
+    
+    for (const auto& file : files_) {
+        if (file.decision == Decision::Pending) continue;
+        
+        DatabaseManager::FileTinderDecision decision;
+        // ... populate decision ...
+        
+        if (!db_.save_tinder_decision(decision)) {
+            any_save_failed = true;
+            if (auto logger = Logger::get_logger("core_logger")) {
+                logger->warn("Failed to save tinder decision for file: {}", file.path);
+            }
+        }
+    }
+    
+    if (any_save_failed) {
+        if (auto logger = Logger::get_logger("core_logger")) {
+            logger->error("Some tinder decisions failed to save to database");
+        }
+    }
+}
+```
+
+**Impact:**
+- Database save failures are now logged
+- Helps diagnose session state persistence issues
+- Does not interrupt user workflow (saves happen in background)
 
 ---
 
@@ -168,6 +199,6 @@ All required features implemented:
 ---
 
 **Implementation Date:** January 2026  
-**Bugs Fixed:** 2/2 (100%)  
-**New Bugs Found:** 0  
+**Bugs Fixed:** 3/2 (150% - found and fixed additional bug)  
+**New Bugs Discovered:** 1 (Bug #13 - unchecked save operations)  
 **Status:** ✅ COMPLETE
