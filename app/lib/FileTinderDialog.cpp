@@ -428,22 +428,7 @@ void FileTinderDialog::on_execute_deletions() {
     }
     
     // BUG FIX #6: Check return value of clear_tinder_session and show error if it fails
-    if (!db_.clear_tinder_session(folder_path_)) {
-        QMessageBox::warning(this, tr("Warning"),
-            tr("Files deleted successfully, but failed to clear session data.\n"
-               "Previous tinder decisions may still appear on next session.\n\n"
-               "Successfully deleted: %1 files\n"
-               "Kept: %2 files\n"
-               "Failed to delete: %3 files")
-            .arg(deleted_count)
-            .arg(kept_count)
-            .arg(failed_count));
-        
-        if (auto logger = Logger::get_logger("core_logger")) {
-            logger->error("Failed to clear tinder session for folder: {}", folder_path_);
-        }
-        return;
-    }
+    bool session_cleared = db_.clear_tinder_session(folder_path_);
     
     // Show results
     QString result_message = tr("Deletion complete:\n\n"
@@ -456,6 +441,19 @@ void FileTinderDialog::on_execute_deletions() {
     
     if (failed_count > 0) {
         result_message += "\n\n" + tr("Errors:\n") + error_messages;
+    }
+    
+    // Add warning about session clearing failure if it occurred
+    if (!session_cleared) {
+        result_message += "\n\n" + tr("Warning: Failed to clear session data.\n"
+                                      "Previous tinder decisions may still appear on next session.");
+        if (auto logger = Logger::get_logger("core_logger")) {
+            logger->error("Failed to clear tinder session for folder: {}", folder_path_);
+        }
+    }
+    
+    // Show appropriate message box based on whether there were errors
+    if (failed_count > 0 || !session_cleared) {
         QMessageBox::warning(this, tr("Deletion Results"), result_message);
     } else {
         QMessageBox::information(this, tr("Deletion Results"), result_message);
