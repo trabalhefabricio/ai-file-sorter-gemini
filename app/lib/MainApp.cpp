@@ -1117,12 +1117,15 @@ void MainApp::handle_analysis_failure(const std::string& message)
         progress_dialog.reset();
     }
     stop_analysis = false;
-    show_error_dialog(message);
+    
+    // Use enhanced error dialog with log access for analysis failures
+    DialogUtils::show_error_with_logs(this, message, true);
 }
 
 
 void MainApp::handle_no_files_to_sort()
 {
+    // Use enhanced error message with actionable tips
     show_error_dialog(ERR_NO_FILES_TO_CATEGORIZE);
 }
 

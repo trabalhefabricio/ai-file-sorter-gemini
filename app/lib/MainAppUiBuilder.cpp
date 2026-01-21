@@ -421,6 +421,16 @@ void MainAppUiBuilder::build_help_menu(MainApp& app) {
     QObject::connect(app.support_project_action, &QAction::triggered, &app, []() {
         MainAppHelpActions::open_support_page();
     });
+
+    // Add separator before troubleshooting actions
+    app.help_menu->addSeparator();
+
+    // Add "Open Log Folder" action for easy access to logs when troubleshooting
+    app.open_logs_action = app.help_menu->addAction(icon_for(app, "folder-open", QStyle::SP_DirIcon), QString());
+    app.open_logs_action->setMenuRole(QAction::NoRole);
+    QObject::connect(app.open_logs_action, &QAction::triggered, &app, [&app]() {
+        MainAppHelpActions::open_log_directory(&app);
+    });
 }
 
 QIcon MainAppUiBuilder::icon_for(MainApp& app, const char* name, QStyle::StandardPixmap fallback) {

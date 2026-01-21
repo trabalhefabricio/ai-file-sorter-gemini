@@ -8,6 +8,7 @@ public:
     static void show_about(QWidget* parent);
     static void show_agpl_info(QWidget* parent);
     static void open_support_page();
+    static void open_log_directory(QWidget* parent);
 };
 
 #endif // MAIN_APP_HELP_ACTIONS_HPP

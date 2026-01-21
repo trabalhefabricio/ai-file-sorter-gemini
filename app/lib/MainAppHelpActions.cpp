@@ -1,4 +1,5 @@
 #include "MainAppHelpActions.hpp"
+#include "ErrorHandler.hpp"
 
 #include <app_version.hpp>
 
@@ -126,3 +127,11 @@ void MainAppHelpActions::open_support_page()
     const QUrl donation_url(QStringLiteral("https://filesorter.app/donate/"));
     QDesktopServices::openUrl(donation_url);
 }
+
+void MainAppHelpActions::open_log_directory(QWidget* parent)
+{
+    // Use the ErrorHandler utility to open log directory
+    // This avoids code duplication and ensures consistent behavior
+    ErrorHandler::open_log_directory(parent);
+}
+

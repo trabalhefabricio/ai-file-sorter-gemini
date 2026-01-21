@@ -3,6 +3,8 @@
 #include "MainApp.hpp"
 #include "Utils.hpp"
 #include "LLMSelectionDialog.hpp"
+#include "StartupErrorDialog.hpp"
+#include "Settings.hpp"
 #include <app_version.hpp>
 
 #include <QApplication>
@@ -20,12 +22,15 @@
 #include <cstring>
 #include <QPainter>
 #include <memory>
+#include <fstream>
+#include <filesystem>
 
 #include <curl/curl.h>
 #include <locale.h>
 #include <libintl.h>
 #include <cstdio>
 #include <iostream>
+#include <fmt/format.h>
 #ifdef _WIN32
 #include <windows.h>
 #ifndef DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
@@ -52,6 +57,14 @@ bool initialize_loggers()
 }
 
 namespace {
+
+// Helper to get core logger safely
+inline std::shared_ptr<spdlog::logger> get_core_logger() {
+    return Logger::get_logger("core_logger");
+}
+
+// Common error message constants
+constexpr const char* ERR_MAINAPP_INIT_FAILED = "Failed to initialize main application window";
 
 struct ParsedArguments {
     bool development_mode{false};
@@ -214,36 +227,176 @@ bool ensure_llm_choice(Settings& settings, const std::function<void()>& finish_s
     return true;
 }
 
+struct PreFlightCheck {
+    bool success;
+    std::string error_message;
+    std::string details;
+};
+
+PreFlightCheck validate_startup_environment()
+{
+    PreFlightCheck result{true, "", ""};
+    
+    // Check if we can access the config directory
+    try {
+        Settings test_settings;
+        std::string config_dir = test_settings.get_config_dir();
+        
+        // Try to create directory if it doesn't exist
+        std::filesystem::path config_path(config_dir);
+        if (!std::filesystem::exists(config_path)) {
+            try {
+                std::filesystem::create_directories(config_path);
+            } catch (const std::exception& ex) {
+                result.success = false;
+                result.error_message = "Cannot create application configuration directory";
+                result.details = fmt::format("Path: {}\nError: {}", config_dir, ex.what());
+                return result;
+            }
+        }
+        
+        // Check if directory is writable by trying to create a test file
+        std::filesystem::path test_file = config_path / ".write_test";
+        try {
+            std::ofstream test_stream(test_file);
+            if (!test_stream) {
+                result.success = false;
+                result.error_message = "Configuration directory is not writable";
+                result.details = fmt::format("Path: {}\nPlease check file permissions", config_dir);
+                return result;
+            }
+            test_stream.close();
+            std::filesystem::remove(test_file);
+        } catch (const std::exception& ex) {
+            result.success = false;
+            result.error_message = "Cannot write to configuration directory";
+            result.details = fmt::format("Path: {}\nError: {}", config_dir, ex.what());
+            return result;
+        }
+        
+    } catch (const std::exception& ex) {
+        result.success = false;
+        result.error_message = "Failed to validate configuration directory";
+        result.details = ex.what();
+        return result;
+    }
+    
+    // Check log directory access
+    try {
+        std::string log_dir = Logger::get_log_directory();
+        std::filesystem::path log_path(log_dir);
+        
+        if (!std::filesystem::exists(log_path)) {
+            try {
+                std::filesystem::create_directories(log_path);
+            } catch (const std::exception& ex) {
+                // Log directory creation failure is not fatal, but worth noting
+                if (auto logger = get_core_logger()) {
+                    logger->warn("Could not create log directory: {}", ex.what());
+                }
+            }
+        }
+    } catch (const std::exception& ex) {
+        // Log directory issues are not fatal
+        if (auto logger = get_core_logger()) {
+            logger->warn("Log directory validation issue: {}", ex.what());
+        }
+    }
+    
+    return result;
+}
+
 int run_application(const ParsedArguments& parsed_args)
 {
-    EmbeddedEnv env_loader(":/net/quicknode/AIFileSorter/.env");
-    env_loader.load_env();
-    setlocale(LC_ALL, "");
-    const std::string locale_path = Utils::get_executable_path() + "/locale";
-    bindtextdomain("net.quicknode.AIFileSorter", locale_path.c_str());
-
-    QCoreApplication::setApplicationName(QStringLiteral("AI File Sorter"));
-    QGuiApplication::setApplicationDisplayName(QStringLiteral("AI File Sorter"));
-
+    // Initialize QApplication early so we can show error dialogs
     int qt_argc = static_cast<int>(parsed_args.qt_args.size()) - 1;
     char** qt_argv = const_cast<char**>(parsed_args.qt_args.data());
     QApplication app(qt_argc, qt_argv);
 
-    Settings settings;
-    settings.load();
+    QCoreApplication::setApplicationName(QStringLiteral("AI File Sorter"));
+    QGuiApplication::setApplicationDisplayName(QStringLiteral("AI File Sorter"));
 
-    const auto finish_splash = [&]() {};
+    try {
+        // Run pre-flight checks before attempting to start the application
+        PreFlightCheck preflight = validate_startup_environment();
+        if (!preflight.success) {
+            if (auto logger = get_core_logger()) {
+                logger->critical("Pre-flight check failed: {}", preflight.details);
+            }
+            StartupErrorDialog::show_startup_error(preflight.error_message, preflight.details);
+            return EXIT_FAILURE;
+        }
 
-    if (!ensure_llm_choice(settings, finish_splash)) {
-        return EXIT_SUCCESS;
+        // Load environment and locale settings
+        EmbeddedEnv env_loader(":/net/quicknode/AIFileSorter/.env");
+        env_loader.load_env();
+        
+        setlocale(LC_ALL, "");
+        const std::string locale_path = Utils::get_executable_path() + "/locale";
+        bindtextdomain("net.quicknode.AIFileSorter", locale_path.c_str());
+
+        // Load settings
+        Settings settings;
+        try {
+            settings.load();
+        } catch (const std::exception& ex) {
+            std::string error_msg = "Failed to load application settings";
+            if (auto logger = get_core_logger()) {
+                logger->critical("Settings load failed: {}", ex.what());
+            }
+            StartupErrorDialog::show_startup_error(error_msg, ex.what());
+            return EXIT_FAILURE;
+        }
+
+        const auto finish_splash = [&]() {};
+
+        // Ensure LLM is configured
+        if (!ensure_llm_choice(settings, finish_splash)) {
+            return EXIT_SUCCESS;
+        }
+
+        // Initialize main application with error handling
+        std::unique_ptr<MainApp> main_app;
+        try {
+            main_app = std::make_unique<MainApp>(settings, parsed_args.development_mode);
+        } catch (const std::exception& ex) {
+            if (auto logger = get_core_logger()) {
+                logger->critical("MainApp initialization failed: {}", ex.what());
+            }
+            StartupErrorDialog::show_startup_error(ERR_MAINAPP_INIT_FAILED, ex.what());
+            return EXIT_FAILURE;
+        } catch (...) {
+            std::string details = "Unknown error occurred during initialization";
+            if (auto logger = get_core_logger()) {
+                logger->critical("MainApp initialization failed: unknown error");
+            }
+            StartupErrorDialog::show_startup_error(ERR_MAINAPP_INIT_FAILED, details);
+            return EXIT_FAILURE;
+        }
+
+        // Run the application
+        main_app->run();
+
+        const int result = app.exec();
+        main_app->shutdown();
+        return result;
+
+    } catch (const std::exception& ex) {
+        std::string error_msg = "Critical startup error";
+        if (auto logger = get_core_logger()) {
+            logger->critical("Critical startup error: {}", ex.what());
+        }
+        StartupErrorDialog::show_startup_error(error_msg, ex.what());
+        return EXIT_FAILURE;
+    } catch (...) {
+        std::string error_msg = "Critical startup error";
+        std::string details = "Unknown exception during application startup";
+        if (auto logger = get_core_logger()) {
+            logger->critical("Critical startup error: unknown exception");
+        }
+        StartupErrorDialog::show_startup_error(error_msg, details);
+        return EXIT_FAILURE;
     }
-
-    MainApp main_app(settings, parsed_args.development_mode);
-    main_app.run();
-
-    const int result = app.exec();
-    main_app.shutdown();
-    return result;
 }
 
 } // namespace
@@ -258,9 +411,28 @@ int main(int argc, char **argv) {
     attach_console_if_requested(parsed.console_log);
 #endif
 
+    // Initialize loggers first - this is critical for error reporting
     if (!initialize_loggers()) {
+        // Logger initialization failed - show basic error dialog
+        std::fprintf(stderr, "FATAL: Failed to initialize logging system\n");
+        
+        // Try to show a basic message box if possible
+        try {
+            int dummy_argc = 1;
+            char* dummy_argv[] = {argv[0], nullptr};
+            QApplication temp_app(dummy_argc, dummy_argv);
+            StartupErrorDialog::show_startup_error(
+                "Logger Initialization Failed",
+                "The application could not initialize its logging system. "
+                "This may indicate a permissions issue or missing directories."
+            );
+        } catch (...) {
+            // Even QApplication failed, just exit
+        }
         return EXIT_FAILURE;
     }
+
+    // Initialize CURL for network operations
     curl_global_init(CURL_GLOBAL_DEFAULT);
     struct CurlCleanup {
         ~CurlCleanup() { curl_global_cleanup(); }
@@ -269,14 +441,47 @@ int main(int argc, char **argv) {
     #ifdef _WIN32
         _putenv("GSETTINGS_SCHEMA_DIR=schemas");
     #endif
+
+    // Run the application with comprehensive error handling
     try {
         return run_application(parsed);
     } catch (const std::exception& ex) {
-        if (auto logger = Logger::get_logger("core_logger")) {
-            logger->critical("Error: {}", ex.what());
+        // Log the critical error
+        if (auto logger = get_core_logger()) {
+            logger->critical("Unhandled exception in main: {}", ex.what());
         } else {
-            std::fprintf(stderr, "Error: %s\n", ex.what());
+            std::fprintf(stderr, "FATAL ERROR: %s\n", ex.what());
         }
+        
+        // Try to show error dialog
+        try {
+            StartupErrorDialog::show_startup_error(
+                "Fatal Application Error",
+                std::string("Unhandled exception: ") + ex.what()
+            );
+        } catch (...) {
+            std::fprintf(stderr, "Failed to show error dialog\n");
+        }
+        
+        return EXIT_FAILURE;
+    } catch (...) {
+        // Unknown exception
+        if (auto logger = get_core_logger()) {
+            logger->critical("Unhandled unknown exception in main");
+        } else {
+            std::fprintf(stderr, "FATAL ERROR: Unknown exception\n");
+        }
+        
+        // Try to show error dialog
+        try {
+            StartupErrorDialog::show_startup_error(
+                "Fatal Application Error",
+                "An unknown error occurred during application startup"
+            );
+        } catch (...) {
+            std::fprintf(stderr, "Failed to show error dialog\n");
+        }
+        
         return EXIT_FAILURE;
     }
 }

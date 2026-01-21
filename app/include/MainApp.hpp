@@ -230,6 +230,7 @@ private:
     QAction* about_qt_action{nullptr};
     QAction* about_agpl_action{nullptr};
     QAction* support_project_action{nullptr};
+    QAction* open_logs_action{nullptr};
 
     std::unique_ptr<CategorizationDialog> categorization_dialog;
     std::unique_ptr<CategorizationProgressDialog> progress_dialog;
