@@ -71,8 +71,18 @@ bool initialize_loggers()
         
         // Create a basic fallback error file even if ErrorReporter fails
         try {
-            std::string fallback_dir = Logger::get_log_directory();
-            std::string fallback_file = fallback_dir + "/STARTUP_ERROR.txt";
+            std::string fallback_dir;
+            std::string fallback_file;
+            
+            try {
+                fallback_dir = Logger::get_log_directory();
+                fallback_file = fallback_dir + "/STARTUP_ERROR.txt";
+            } catch (...) {
+                // If we can't even get log directory, try a temp location
+                fallback_dir = ".";
+                fallback_file = "./STARTUP_ERROR.txt";
+            }
+            
             std::ofstream out(fallback_file);
             if (out.is_open()) {
                 out << "CRITICAL STARTUP ERROR\n";
@@ -357,7 +367,12 @@ int main(int argc, char **argv) {
         try {
             fallback_file = Logger::get_log_directory() + "/STARTUP_ERROR.txt";
         } catch (...) {
-            // If we can't even get log directory, leave it empty
+            // If we can't get log directory, try current directory
+            try {
+                fallback_file = "./STARTUP_ERROR.txt";
+            } catch (...) {
+                // If even this fails, leave it empty
+            }
         }
         
 #ifdef _WIN32

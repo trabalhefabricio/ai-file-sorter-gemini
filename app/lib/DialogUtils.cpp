@@ -172,37 +172,33 @@ void DialogUtils::show_startup_error_dialog(QWidget* parent,
     if (!error_report_file.empty()) {
         QFileInfo file_info(QString::fromStdString(error_report_file));
         if (file_info.exists()) {
-            full_message += "\n\n";
-            full_message += QObject::tr("📋 Detailed Error Report:");
-            full_message += "\n";
-            full_message += file_info.absoluteFilePath();
-            full_message += "\n\n";
-            full_message += QObject::tr("💡 To get help:");
-            full_message += "\n";
-            full_message += QObject::tr("1. Click 'Copy Error Report' below");
-            full_message += "\n";
-            full_message += QObject::tr("2. Paste into GitHub Copilot Chat or GitHub issue");
-            full_message += "\n";
-            full_message += QObject::tr("3. Ask: \"How do I fix this error?\"");
+            full_message.append(
+                QString("\n\n%1\n%2\n\n%3\n%4\n%5\n%6")
+                .arg(QObject::tr("📋 Detailed Error Report:"))
+                .arg(file_info.absoluteFilePath())
+                .arg(QObject::tr("💡 To get help:"))
+                .arg(QObject::tr("1. Click 'Copy Error Report' below"))
+                .arg(QObject::tr("2. Paste into GitHub Copilot Chat or GitHub issue"))
+                .arg(QObject::tr("3. Ask: \"How do I fix this error?\""))
+            );
         } else {
             // File doesn't exist yet, just tell them where logs are
             QDir log_dir = file_info.dir();
-            full_message += "\n\n";
-            full_message += QObject::tr("📋 Logs directory:");
-            full_message += "\n";
-            full_message += log_dir.absolutePath();
-            full_message += "\n\n";
-            full_message += QObject::tr("💡 Check the logs directory for detailed error information.");
+            full_message.append(
+                QString("\n\n%1\n%2\n\n%3")
+                .arg(QObject::tr("📋 Logs directory:"))
+                .arg(log_dir.absolutePath())
+                .arg(QObject::tr("💡 Check the logs directory for detailed error information."))
+            );
         }
     } else {
-        full_message += "\n\n";
-        full_message += QObject::tr("💡 To report this issue:");
-        full_message += "\n";
-        full_message += QObject::tr("1. Click 'Copy Error Info' below");
-        full_message += "\n";
-        full_message += QObject::tr("2. Paste into GitHub Copilot Chat or create a GitHub issue");
-        full_message += "\n";
-        full_message += QObject::tr("3. Include any additional context about what you were doing");
+        full_message.append(
+            QString("\n\n%1\n%2\n%3\n%4")
+            .arg(QObject::tr("💡 To report this issue:"))
+            .arg(QObject::tr("1. Click 'Copy Error Info' below"))
+            .arg(QObject::tr("2. Paste into GitHub Copilot Chat or create a GitHub issue"))
+            .arg(QObject::tr("3. Include any additional context about what you were doing"))
+        );
     }
     
     msg_box.setText(full_message);
