@@ -355,12 +355,13 @@ int main(int argc, char **argv) {
 #endif
 
     if (!initialize_loggers()) {
-        std::string error_msg = "Failed to initialize logging system.\n\n";
-        error_msg += "The application cannot start without logging.\n\n";
-        error_msg += "Please check:\n";
-        error_msg += "  - Disk space availability\n";
-        error_msg += "  - Write permissions in application directory\n";
-        error_msg += "  - Logs directory exists and is writable";
+        const std::string error_msg = 
+            "Failed to initialize logging system.\n\n"
+            "The application cannot start without logging.\n\n"
+            "Please check:\n"
+            "  - Disk space availability\n"
+            "  - Write permissions in application directory\n"
+            "  - Logs directory exists and is writable";
         
         // Try to find the fallback error file
         std::string fallback_file;
@@ -418,10 +419,9 @@ int main(int argc, char **argv) {
         std::string error_report_file = ErrorReporter::get_last_error_report_path();
         
         // Build error message
-        std::string error_msg = "Application Error: ";
-        error_msg += ex.what();
-        error_msg += "\n\nError Code: ";
-        error_msg += std::to_string(static_cast<int>(ex.get_error_code()));
+        const std::string error_msg = 
+            "Application Error: " + std::string(ex.what()) +
+            "\n\nError Code: " + std::to_string(static_cast<int>(ex.get_error_code()));
         
 #ifdef _WIN32
         if (QApplication::instance()) {
@@ -450,9 +450,9 @@ int main(int argc, char **argv) {
         std::string error_report_file = ErrorReporter::get_last_error_report_path();
         
         // Build error message
-        std::string error_msg = "Runtime Error: ";
-        error_msg += ex.what();
-        error_msg += "\n\nThe application encountered an unexpected error and must exit.";
+        const std::string error_msg = 
+            "Runtime Error: " + std::string(ex.what()) +
+            "\n\nThe application encountered an unexpected error and must exit.";
         
 #ifdef _WIN32
         if (QApplication::instance()) {
@@ -479,10 +479,10 @@ int main(int argc, char **argv) {
         std::string error_report_file = ErrorReporter::get_last_error_report_path();
         
         // Build error message
-        std::string error_msg = "Unexpected Error: ";
-        error_msg += ex.what();
-        error_msg += "\n\nThe application encountered a critical error and must exit.\n";
-        error_msg += "Please check the log files for details.";
+        const std::string error_msg = 
+            "Unexpected Error: " + std::string(ex.what()) +
+            "\n\nThe application encountered a critical error and must exit.\n"
+            "Please check the log files for details.";
         
 #ifdef _WIN32
         if (QApplication::instance()) {
@@ -510,9 +510,10 @@ int main(int argc, char **argv) {
         std::string error_report_file = ErrorReporter::get_last_error_report_path();
         
         // Build error message
-        std::string error_msg = "An unknown critical error occurred.\n\n";
-        error_msg += "The application must exit.\n";
-        error_msg += "Please check the log files for details.";
+        const std::string error_msg = 
+            "An unknown critical error occurred.\n\n"
+            "The application must exit.\n"
+            "Please check the log files for details.";
         
 #ifdef _WIN32
         if (QApplication::instance()) {
