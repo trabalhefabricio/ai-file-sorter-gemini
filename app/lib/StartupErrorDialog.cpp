@@ -16,6 +16,7 @@
 #include <QDateTime>
 #include <QFont>
 #include <QFontDatabase>
+#include <QStyle>
 
 #include <filesystem>
 #include <sstream>

@@ -696,7 +696,7 @@ void WhitelistTreeEditor::on_import_config()
     }
     
     // Import mode
-    bool is_hierarchical = root.value("use_hierarchical", false).toBool();
+    bool is_hierarchical = root.contains("use_hierarchical") ? root["use_hierarchical"].toBool() : false;
     if (is_hierarchical) {
         hierarchical_mode_radio_->setChecked(true);
     } else {

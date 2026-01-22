@@ -1,0 +1,18 @@
+#ifndef ERROR_CODE_HPP
+#define ERROR_CODE_HPP
+
+namespace ErrorCodes {
+
+enum class Code {
+    API_AUTHENTICATION_FAILED,
+    API_INSUFFICIENT_PERMISSIONS,
+    API_RATE_LIMIT_EXCEEDED,
+    API_SERVER_ERROR,
+    API_INVALID_REQUEST,
+    API_RESPONSE_PARSE_ERROR,
+    API_INVALID_RESPONSE
+};
+
+} // namespace ErrorCodes
+
+#endif // ERROR_CODE_HPP
