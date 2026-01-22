@@ -85,6 +85,7 @@ public:
         QAction*& about_qt_action;
         QAction*& about_agpl_action;
         QAction*& support_project_action;
+        QAction*& open_logs_action;
     };
 
     struct LanguageControls {
