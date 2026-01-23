@@ -106,6 +106,14 @@ struct ModelState {
     
     // BUG FIX #2: Add mutex for thread-safe access
     mutable std::mutex state_mutex;
+    
+    // Explicitly delete copy operations (std::mutex is non-copyable)
+    ModelState() = default;
+    ModelState(const ModelState&) = delete;
+    ModelState& operator=(const ModelState&) = delete;
+    // Allow move operations
+    ModelState(ModelState&&) = default;
+    ModelState& operator=(ModelState&&) = default;
 };
 
 // BUG FIX #1: Use joinable thread instead of detached to avoid use-after-free
@@ -138,7 +146,7 @@ public:
             // Try to read extended fields (backward compatible)
             ss >> s.consecutive_failures >> s.circuit_open_until_ms 
                >> s.last_timeout_ms >> s.timeout_extensions;
-            states_[model] = s;
+            states_[model] = std::move(s);
         }
     }
 
@@ -161,21 +169,56 @@ public:
     ModelState get(const std::string& model) {
         std::lock_guard<std::mutex> g(mu_);
         if (states_.count(model)) {
-            // BUG FIX #2: Return copy to avoid external access to internal state
-            return states_[model];
+            // Create a new ModelState with the data (mutex can't be copied)
+            ModelState result;
+            const auto& existing = states_[model];
+            result.tokens = existing.tokens;
+            result.capacity = existing.capacity;
+            result.refill_per_sec = existing.refill_per_sec;
+            result.last_refill_ms = existing.last_refill_ms;
+            result.retry_after_until_ms = existing.retry_after_until_ms;
+            result.ewma_ms = existing.ewma_ms;
+            result.consecutive_failures = existing.consecutive_failures;
+            result.circuit_open_until_ms = existing.circuit_open_until_ms;
+            result.last_timeout_ms = existing.last_timeout_ms;
+            result.timeout_extensions = existing.timeout_extensions;
+            return result;
         }
         ModelState s;
         s.tokens = s.capacity;
         s.last_refill_ms = now_ms();
-        states_[model] = s;
-        return s;
+        states_[model] = std::move(s);
+        // Return a copy of the data
+        ModelState result;
+        const auto& existing = states_[model];
+        result.tokens = existing.tokens;
+        result.capacity = existing.capacity;
+        result.refill_per_sec = existing.refill_per_sec;
+        result.last_refill_ms = existing.last_refill_ms;
+        result.retry_after_until_ms = existing.retry_after_until_ms;
+        result.ewma_ms = existing.ewma_ms;
+        result.consecutive_failures = existing.consecutive_failures;
+        result.circuit_open_until_ms = existing.circuit_open_until_ms;
+        result.last_timeout_ms = existing.last_timeout_ms;
+        result.timeout_extensions = existing.timeout_extensions;
+        return result;
     }
 
     void put(const std::string& model, const ModelState& s) {
         {
             std::lock_guard<std::mutex> g(mu_);
-            // BUG FIX #2: Lock acquisition ensures thread-safe modification
-            states_[model] = s;
+            // Copy data fields without copying mutex
+            auto& dest = states_[model];
+            dest.tokens = s.tokens;
+            dest.capacity = s.capacity;
+            dest.refill_per_sec = s.refill_per_sec;
+            dest.last_refill_ms = s.last_refill_ms;
+            dest.retry_after_until_ms = s.retry_after_until_ms;
+            dest.ewma_ms = s.ewma_ms;
+            dest.consecutive_failures = s.consecutive_failures;
+            dest.circuit_open_until_ms = s.circuit_open_until_ms;
+            dest.last_timeout_ms = s.last_timeout_ms;
+            dest.timeout_extensions = s.timeout_extensions;
         }
         schedule_save();
     }

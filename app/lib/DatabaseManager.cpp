@@ -1204,3 +1204,11 @@ bool DatabaseManager::clear_tinder_session(const std::string& folder_path) {
     sqlite3_finalize(stmt);
     return success;
 }
+
+bool DatabaseManager::record_api_usage(const std::string& service, int prompt_tokens, int completion_tokens, float cost) {
+    // Simple implementation that logs the usage
+    // A full implementation would require creating an api_usage table in initialize_schema()
+    db_log(spdlog::level::debug, "API usage recorded: service={}, prompt_tokens={}, completion_tokens={}, cost={}", 
+           service, prompt_tokens, completion_tokens, cost);
+    return true;
+}
