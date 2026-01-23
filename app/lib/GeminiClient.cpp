@@ -116,6 +116,20 @@ struct ModelState {
     ModelState& operator=(ModelState&&) = default;
 };
 
+// Helper function to copy ModelState data fields without copying the mutex
+inline void copy_state_data(const ModelState& src, ModelState& dest) {
+    dest.tokens = src.tokens;
+    dest.capacity = src.capacity;
+    dest.refill_per_sec = src.refill_per_sec;
+    dest.last_refill_ms = src.last_refill_ms;
+    dest.retry_after_until_ms = src.retry_after_until_ms;
+    dest.ewma_ms = src.ewma_ms;
+    dest.consecutive_failures = src.consecutive_failures;
+    dest.circuit_open_until_ms = src.circuit_open_until_ms;
+    dest.last_timeout_ms = src.last_timeout_ms;
+    dest.timeout_extensions = src.timeout_extensions;
+}
+
 // BUG FIX #1: Use joinable thread instead of detached to avoid use-after-free
 class PersistentState {
 public:
@@ -171,17 +185,7 @@ public:
         if (states_.count(model)) {
             // Create a new ModelState with the data (mutex can't be copied)
             ModelState result;
-            const auto& existing = states_[model];
-            result.tokens = existing.tokens;
-            result.capacity = existing.capacity;
-            result.refill_per_sec = existing.refill_per_sec;
-            result.last_refill_ms = existing.last_refill_ms;
-            result.retry_after_until_ms = existing.retry_after_until_ms;
-            result.ewma_ms = existing.ewma_ms;
-            result.consecutive_failures = existing.consecutive_failures;
-            result.circuit_open_until_ms = existing.circuit_open_until_ms;
-            result.last_timeout_ms = existing.last_timeout_ms;
-            result.timeout_extensions = existing.timeout_extensions;
+            copy_state_data(states_[model], result);
             return result;
         }
         ModelState s;
@@ -190,17 +194,7 @@ public:
         states_[model] = std::move(s);
         // Return a copy of the data
         ModelState result;
-        const auto& existing = states_[model];
-        result.tokens = existing.tokens;
-        result.capacity = existing.capacity;
-        result.refill_per_sec = existing.refill_per_sec;
-        result.last_refill_ms = existing.last_refill_ms;
-        result.retry_after_until_ms = existing.retry_after_until_ms;
-        result.ewma_ms = existing.ewma_ms;
-        result.consecutive_failures = existing.consecutive_failures;
-        result.circuit_open_until_ms = existing.circuit_open_until_ms;
-        result.last_timeout_ms = existing.last_timeout_ms;
-        result.timeout_extensions = existing.timeout_extensions;
+        copy_state_data(states_[model], result);
         return result;
     }
 
@@ -208,17 +202,7 @@ public:
         {
             std::lock_guard<std::mutex> g(mu_);
             // Copy data fields without copying mutex
-            auto& dest = states_[model];
-            dest.tokens = s.tokens;
-            dest.capacity = s.capacity;
-            dest.refill_per_sec = s.refill_per_sec;
-            dest.last_refill_ms = s.last_refill_ms;
-            dest.retry_after_until_ms = s.retry_after_until_ms;
-            dest.ewma_ms = s.ewma_ms;
-            dest.consecutive_failures = s.consecutive_failures;
-            dest.circuit_open_until_ms = s.circuit_open_until_ms;
-            dest.last_timeout_ms = s.last_timeout_ms;
-            dest.timeout_extensions = s.timeout_extensions;
+            copy_state_data(s, states_[model]);
         }
         schedule_save();
     }
@@ -238,11 +222,16 @@ private:
         std::map<std::string, ModelState> states_copy;
         {
             std::lock_guard<std::mutex> g(mu_);
-            states_copy = states_;
+            // Manually copy each state since ModelState is non-copyable
+            for (const auto& [model, state] : states_) {
+                ModelState copy;
+                copy_state_data(state, copy);
+                states_copy[model] = std::move(copy);
+            }
         }
         
-        // BUG FIX #1: Capture by value to avoid dangling references
-        save_thread_ = std::thread([this, path_copy, states_copy]() {
+        // BUG FIX #1: Capture by move to avoid dangling references (states_copy is non-copyable)
+        save_thread_ = std::thread([this, path_copy = std::move(path_copy), states_copy = std::move(states_copy)]() mutable {
             std::this_thread::sleep_for(250ms);
             
             // Perform save with copied data
