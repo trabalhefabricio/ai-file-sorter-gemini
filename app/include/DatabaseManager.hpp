@@ -60,6 +60,9 @@ public:
     std::vector<FileTinderDecision> get_tinder_decisions(const std::string& folder_path);
     bool clear_tinder_session(const std::string& folder_path);
 
+    // API usage tracking
+    bool record_api_usage(const std::string& service, int prompt_tokens, int completion_tokens, float cost);
+
 private:
     struct TaxonomyEntry {
         int id;

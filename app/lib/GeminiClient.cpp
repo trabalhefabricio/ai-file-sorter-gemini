@@ -106,7 +106,29 @@ struct ModelState {
     
     // BUG FIX #2: Add mutex for thread-safe access
     mutable std::mutex state_mutex;
+    
+    // Explicitly delete copy operations (std::mutex is non-copyable)
+    ModelState() = default;
+    ModelState(const ModelState&) = delete;
+    ModelState& operator=(const ModelState&) = delete;
+    // Allow move operations
+    ModelState(ModelState&&) = default;
+    ModelState& operator=(ModelState&&) = default;
 };
+
+// Helper function to copy ModelState data fields without copying the mutex
+inline void copy_state_data(const ModelState& src, ModelState& dest) {
+    dest.tokens = src.tokens;
+    dest.capacity = src.capacity;
+    dest.refill_per_sec = src.refill_per_sec;
+    dest.last_refill_ms = src.last_refill_ms;
+    dest.retry_after_until_ms = src.retry_after_until_ms;
+    dest.ewma_ms = src.ewma_ms;
+    dest.consecutive_failures = src.consecutive_failures;
+    dest.circuit_open_until_ms = src.circuit_open_until_ms;
+    dest.last_timeout_ms = src.last_timeout_ms;
+    dest.timeout_extensions = src.timeout_extensions;
+}
 
 // BUG FIX #1: Use joinable thread instead of detached to avoid use-after-free
 class PersistentState {
@@ -138,7 +160,7 @@ public:
             // Try to read extended fields (backward compatible)
             ss >> s.consecutive_failures >> s.circuit_open_until_ms 
                >> s.last_timeout_ms >> s.timeout_extensions;
-            states_[model] = s;
+            states_[model] = std::move(s);
         }
     }
 
@@ -161,21 +183,26 @@ public:
     ModelState get(const std::string& model) {
         std::lock_guard<std::mutex> g(mu_);
         if (states_.count(model)) {
-            // BUG FIX #2: Return copy to avoid external access to internal state
-            return states_[model];
+            // Create a new ModelState with the data (mutex can't be copied)
+            ModelState result;
+            copy_state_data(states_[model], result);
+            return result;
         }
         ModelState s;
         s.tokens = s.capacity;
         s.last_refill_ms = now_ms();
-        states_[model] = s;
-        return s;
+        states_[model] = std::move(s);
+        // Return a copy of the data
+        ModelState result;
+        copy_state_data(states_[model], result);
+        return result;
     }
 
     void put(const std::string& model, const ModelState& s) {
         {
             std::lock_guard<std::mutex> g(mu_);
-            // BUG FIX #2: Lock acquisition ensures thread-safe modification
-            states_[model] = s;
+            // Copy data fields without copying mutex
+            copy_state_data(s, states_[model]);
         }
         schedule_save();
     }
@@ -195,11 +222,16 @@ private:
         std::map<std::string, ModelState> states_copy;
         {
             std::lock_guard<std::mutex> g(mu_);
-            states_copy = states_;
+            // Manually copy each state since ModelState is non-copyable
+            for (const auto& [model, state] : states_) {
+                ModelState copy;
+                copy_state_data(state, copy);
+                states_copy[model] = std::move(copy);
+            }
         }
         
-        // BUG FIX #1: Capture by value to avoid dangling references
-        save_thread_ = std::thread([this, path_copy, states_copy]() {
+        // BUG FIX #1: Capture by move to avoid dangling references (states_copy is non-copyable)
+        save_thread_ = std::thread([this, path_copy = std::move(path_copy), states_copy = std::move(states_copy)]() {
             std::this_thread::sleep_for(250ms);
             
             // Perform save with copied data

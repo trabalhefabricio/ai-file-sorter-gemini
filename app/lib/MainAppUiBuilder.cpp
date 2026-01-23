@@ -217,7 +217,8 @@ UiTranslator::Dependencies MainAppUiBuilder::build_translator_dependencies(MainA
             app.about_action,
             app.about_qt_action,
             app.about_agpl_action,
-            app.support_project_action},
+            app.support_project_action,
+            app.open_logs_action},
         .language = UiTranslator::LanguageControls{
             app.language_group,
             app.english_action,
